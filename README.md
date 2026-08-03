@@ -80,10 +80,22 @@ export function obtenerProductos() {
 - Las clases utilitarias de Tailwind se usan directo en el `className` de cada componente.
 - Si se necesita personalizar colores, fuentes, etc., se hace con `@theme` dentro de `src/index.css` (no en un archivo de configuración aparte).
 
-## Convenciones de Git
+## Flujo de trabajo con Git
 
-- Rama principal: `main`, protegida (requiere al menos un review antes de mergear).
-- Mismo criterio que en `Backend`: commits descriptivos, no genéricos.
+- **`main`**: versión estable, la que se muestra en cada Sprint Review. Protegida — nadie pushea directo.
+- **`dev`**: rama de integración del Sprint en curso. También protegida — nadie pushea directo.
+- Cada Historia de Usuario se desarrolla en su propia rama, creada desde `dev`:
+
+```bash
+  git checkout dev
+  git pull origin dev
+  git checkout -b feature/HU1-registro-usuario
+```
+
+- Al terminar, se abre un Pull Request hacia `dev` (no hacia `main`), asignando a otro integrante como reviewer.
+- La promoción de `dev` → `main` la gestiona la persona a cargo de testing, una vez que los tests de integración (en el repo `Infraestructura`) pasan sobre el estado actual de `dev`.
+- Después de mergear una feature branch, borrarla (GitHub lo ofrece con un botón automático al cerrar el PR).
+- Commits descriptivos, no genéricos (mismo criterio que en `Backend`).
 
 ## Troubleshooting
 
