@@ -31,6 +31,20 @@ npm run dev
 - App disponible en `http://localhost:5173`
 - Cualquier llamada a `/api/...` se redirige automáticamente al backend en `http://localhost:4000` (configurado en `vite.config.js`, sección `server.proxy`) — **nunca hardcodear la URL del backend en el código**, siempre usar rutas relativas como `/api/productos`.
 
+## Docker
+
+Este repo incluye un `Dockerfile` multi-etapa: primero compila la app con Node (`npm run build`), después descarta Node y sirve el resultado (`dist/`) con un Nginx liviano propio de este contenedor. Ese Nginx interno es distinto del Nginx principal del repo `Infraestructura` — este solo sirve los archivos estáticos ya compilados, no hace de reverse proxy.
+
+Al igual que el backend, **no se usa de forma aislada** — se construye y orquesta junto con `Backend` y `Nginx` desde `docker-compose.yml` en el repo `Infraestructura`, que referencia este repo como contexto de build.
+
+Para desarrollo del día a día, seguir usando `npm run dev` como se indica arriba.
+
+Si se necesita construir la imagen de este repo de forma aislada (poco común, mayormente para debug):
+
+```bash
+docker build -t frontend .
+```
+
 ## Variables de entorno
 
 Este proyecto **no necesita `.env`** en condiciones normales. Gracias al proxy de desarrollo (y a Nginx en producción), el frontend nunca necesita saber la URL real del backend ni manejar secretos.
