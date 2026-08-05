@@ -47,7 +47,7 @@ docker build -t frontend .
 
 ## Variables de entorno
 
-Este proyecto **no necesita `.env`** en condiciones normales. Gracias al proxy de desarrollo (y a Nginx en producción), el frontend nunca necesita saber la URL real del backend ni manejar secretos.
+Este proyecto **no necesita `.env`** en condiciones normales. En desarrollo, el proxy de Vite resuelve las llamadas a `/api/...`. En producción, el frontend se despliega en **Vercel** como sitio estático independiente — no detrás de Nginx —, por lo que el consumo de `/api/...` deberá apuntar a la URL pública del backend en Render (a definir cuando se configure el despliegue). El frontend nunca maneja secretos en ningún escenario.
 
 Si en algún momento se necesita una variable pública (no secreta, por ejemplo un flag de feature), Vite usa el prefijo `VITE_` y queda expuesta en el build final — **nunca poner ahí claves de API ni nada sensible**, ya que cualquiera puede leerlas inspeccionando el JS compilado.
 
