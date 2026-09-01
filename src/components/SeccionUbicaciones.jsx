@@ -25,8 +25,14 @@ const CLASES_BOTON_SUAVE =
   "rounded-(--radius) px-3 py-2 text-sm font-bold transition " +
   "focus:outline-none focus:ring-4 focus:ring-(--color-primario-suave)";
 
-/** Una fila de la lista, que alterna entre ver, renombrar y confirmar borrado. */
-function FilaUbicacion({ ubicacion, alRenombrar, alEliminar }) {
+/**
+ * Una fila de la lista, que alterna entre ver, renombrar y confirmar borrado.
+ *
+ * `guardando` viene de arriba para deshabilitar los botones mientras hay una
+ * operación en curso. Sin eso, un doble clic en «Sí, eliminar» manda dos DELETE
+ * y el segundo vuelve con un 404 confuso sobre una fila que ya no existe.
+ */
+function FilaUbicacion({ ubicacion, alRenombrar, alEliminar, guardando }) {
   const [modo, setModo] = useState("ver");
   const [nombre, setNombre] = useState(ubicacion.nombre);
 
@@ -39,8 +45,9 @@ function FilaUbicacion({ ubicacion, alRenombrar, alEliminar }) {
         <div className="mt-2 flex gap-2">
           <button
             type="button"
+            disabled={guardando}
             onClick={() => alEliminar(ubicacion.id)}
-            className={`${CLASES_BOTON_SUAVE} bg-(--color-peligro) text-(--color-peligro-texto)`}
+            className={`${CLASES_BOTON_SUAVE} bg-(--color-peligro) text-(--color-peligro-texto) disabled:opacity-60`}
           >
             Sí, eliminar
           </button>
@@ -62,8 +69,12 @@ function FilaUbicacion({ ubicacion, alRenombrar, alEliminar }) {
         <form
           onSubmit={async (evento) => {
             evento.preventDefault();
-            await alRenombrar(ubicacion.id, nombre);
-            setModo("ver");
+            // Solo se cierra la edición si el backend aceptó. Si rechaza (por
+            // ejemplo, nombre repetido), la fila volvía a "ver" mostrando el
+            // nombre viejo y parecía que ni se había intentado.
+            if (await alRenombrar(ubicacion.id, nombre)) {
+              setModo("ver");
+            }
           }}
           className="flex flex-col gap-2 sm:flex-row"
         >
@@ -79,7 +90,8 @@ function FilaUbicacion({ ubicacion, alRenombrar, alEliminar }) {
           <div className="flex gap-2">
             <button
               type="submit"
-              className={`${CLASES_BOTON_SUAVE} bg-(--color-primario) text-(--color-primario-texto)`}
+              disabled={guardando}
+              className={`${CLASES_BOTON_SUAVE} bg-(--color-primario) text-(--color-primario-texto) disabled:opacity-60`}
             >
               Guardar
             </button>
@@ -108,17 +120,19 @@ function FilaUbicacion({ ubicacion, alRenombrar, alEliminar }) {
       <div className="flex shrink-0 gap-1">
         <button
           type="button"
+          disabled={guardando}
           onClick={() => setModo("editar")}
           aria-label={`Renombrar ${ubicacion.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-primario)`}
+          className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
         >
           Renombrar
         </button>
         <button
           type="button"
+          disabled={guardando}
           onClick={() => setModo("confirmar")}
           aria-label={`Eliminar ${ubicacion.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-peligro)`}
+          className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
         >
           Eliminar
         </button>
@@ -203,6 +217,7 @@ export default function SeccionUbicaciones({ configuracion, alRecargar }) {
               <FilaUbicacion
                 key={ubicacion.id}
                 ubicacion={ubicacion}
+                guardando={guardando}
                 alRenombrar={(id, nombre) =>
                   ejecutar(() => renombrarUbicacion(id, nombre.trim()))
                 }

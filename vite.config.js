@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       // El proxy preserva el prefijo: /api/auth/x llega al backend como
-      // /api/auth/x, igual que a traves de Nginx en el stack de Docker.
+      // /api/auth/x, igual que a través de Nginx en el stack de Docker.
       "/api": "http://localhost:4000",
     },
   },

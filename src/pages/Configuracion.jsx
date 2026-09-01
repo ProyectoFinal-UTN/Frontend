@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
@@ -45,42 +45,40 @@ export default function Configuracion() {
     ? pedida
     : SECCION_POR_DEFECTO;
 
+  // La recarga que dispara la sección hija puede volver después de que la
+  // pantalla se desmontó. El ref lo comparten la carga inicial y las recargas,
+  // así los dos caminos se protegen igual.
+  const montado = useRef(true);
+
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+
   // Devuelve la promesa en vez de usar async/await para que quede explícito
   // que ningún `setState` ocurre de forma síncrona dentro del efecto.
   const cargar = useCallback(
     () =>
       obtenerConfiguracion()
         .then((datos) => {
+          if (!montado.current) return;
           setConfiguracion(datos);
           setError("");
         })
-        .catch((fallo) => setError(fallo.message))
-        .finally(() => setCargando(false)),
+        .catch((fallo) => {
+          if (montado.current) setError(fallo.message);
+        })
+        .finally(() => {
+          if (montado.current) setCargando(false);
+        }),
     [],
   );
 
   useEffect(() => {
-    // `activo` evita tocar el estado si la pantalla se desmontó mientras la
-    // respuesta venía en camino.
-    let activo = true;
-
-    obtenerConfiguracion()
-      .then((datos) => {
-        if (!activo) return;
-        setConfiguracion(datos);
-        setError("");
-      })
-      .catch((fallo) => {
-        if (activo) setError(fallo.message);
-      })
-      .finally(() => {
-        if (activo) setCargando(false);
-      });
-
-    return () => {
-      activo = false;
-    };
-  }, []);
+    cargar();
+  }, [cargar]);
 
   const seccion = SECCIONES.find((s) => s.id === activa);
 
