@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { cerrarSesion } from "../services/auth";
 
@@ -27,15 +27,25 @@ export default function Inicio() {
         historias.
       </p>
 
-      <button
-        type="button"
-        onClick={salir}
-        className="mt-8 rounded-(--radius) border-2 border-(--color-borde)
-                   bg-(--color-tarjeta) px-4 py-3 font-bold text-(--color-texto)
-                   transition hover:border-(--color-primario)"
-      >
-        Cerrar sesión
-      </button>
+      <div className="mt-8 flex flex-col gap-3">
+        <Link
+          to="/configuracion"
+          className="rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center
+                     font-bold text-(--color-primario-texto) transition hover:opacity-90"
+        >
+          Configuración
+        </Link>
+
+        <button
+          type="button"
+          onClick={salir}
+          className="rounded-(--radius) border-2 border-(--color-borde)
+                     bg-(--color-tarjeta) px-4 py-3 font-bold text-(--color-texto)
+                     transition hover:border-(--color-primario)"
+        >
+          Cerrar sesión
+        </button>
+      </div>
     </main>
   );
 }
