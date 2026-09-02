@@ -22,6 +22,30 @@ const cliente = createAuthClient({
 export const useSesion = cliente.useSession;
 
 /**
+ * Espera a que el store de sesión refleje el cambio antes de devolver.
+ *
+ * Hace falta por cómo Better Auth propaga la sesión: cuando el login responde,
+ * la actualización del store se dispara con un `setTimeout(..., 10)` interno
+ * (lo hace para evitar carreras propias). En ese hueco de 10 ms el store sigue
+ * diciendo que no hay sesión.
+ *
+ * Sin esta espera, la pantalla navegaba apenas respondía el login, y
+ * `RutaProtegida` leía el store viejo y rebotaba de vuelta al formulario: había
+ * que apretar "Entrar" dos veces para pasar. Lo mismo pasaba tras registrarse.
+ *
+ * `refetch` viene en el valor del propio atom y actualiza el store al resolver,
+ * así que esperarlo garantiza que quien navegue después vea la sesión real.
+ */
+async function esperarSesionActualizada() {
+  try {
+    await cliente.$store.atoms.session.get().refetch();
+  } catch {
+    // Si el refresco falla, la sesión ya quedó creada igual: no tiene sentido
+    // hacer fallar el login por esto. La pantalla siguiente la resolverá.
+  }
+}
+
+/**
  * Traduce los errores del backend a algo que se le pueda mostrar a un
  * comerciante. Sin esto la pantalla mostraría "User already exists. Use
  * another email." en inglés y con jerga.
@@ -75,6 +99,8 @@ export async function registrar({ correo, password }) {
     return { ok: false, error: traducirError(error) };
   }
 
+  await esperarSesionActualizada();
+
   return { ok: true, usuario: data.user };
 }
 
@@ -89,6 +115,8 @@ export async function iniciarSesion({ correo, password }) {
     return { ok: false, error: traducirError(error) };
   }
 
+  await esperarSesionActualizada();
+
   return { ok: true, usuario: data.user };
 }
 
@@ -99,6 +127,8 @@ export async function cerrarSesion() {
   if (error) {
     return { ok: false, error: traducirError(error) };
   }
+
+  await esperarSesionActualizada();
 
   return { ok: true };
 }
