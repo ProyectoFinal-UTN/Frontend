@@ -1,34 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registrar } from "../services/auth";
+import Campo from "../components/Campo";
 import { validarRegistro } from "./Registro.validacion";
-
-/** Un campo de texto con su etiqueta y su mensaje de error. */
-function Campo({ id, etiqueta, error, ...props }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-bold text-(--color-texto)">
-        {etiqueta}
-      </label>
-      <input
-        id={id}
-        name={id}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? `error-${id}` : undefined}
-        className={`w-full rounded-(--radius) border-2 bg-(--color-tarjeta) px-4 py-3
-                    text-base text-(--color-texto) outline-none transition
-                    focus:border-(--color-primario)
-                    ${error ? "border-(--color-peligro)" : "border-(--color-borde)"}`}
-        {...props}
-      />
-      {error && (
-        <p id={`error-${id}`} className="text-sm text-(--color-peligro)">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function Registro() {
   const navegar = useNavigate();

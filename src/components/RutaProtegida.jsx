@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 /**
@@ -7,9 +7,13 @@ import { useAuth } from "../hooks/useAuth";
  * Mientras la sesión se está resolviendo no redirige: mandar al login a
  * alguien que sí está logueado, solo porque la respuesta todavía no llegó, se
  * ve como un parpadeo raro al recargar la página.
+ *
+ * Al redirigir guarda la ruta que se intentó abrir, para que después de entrar
+ * vuelva ahí y no al inicio.
  */
 export default function RutaProtegida({ children }) {
   const { autenticado, cargando } = useAuth();
+  const ubicacion = useLocation();
 
   if (cargando) {
     return (
@@ -20,7 +24,15 @@ export default function RutaProtegida({ children }) {
   }
 
   if (!autenticado) {
-    return <Navigate to="/registro" replace />;
+    // Al login y no al registro: quien llega a una pantalla protegida casi
+    // siempre ya tiene cuenta y lo que le falta es entrar.
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ desde: ubicacion.pathname + ubicacion.search }}
+      />
+    );
   }
 
   return children;
