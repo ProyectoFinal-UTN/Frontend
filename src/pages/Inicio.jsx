@@ -30,6 +30,14 @@ export default function Inicio() {
 
       <div className="mt-8 flex flex-col gap-3">
         <Link
+          to="/productos"
+          className="rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center
+                     font-bold text-(--color-primario-texto) transition hover:opacity-90"
+        >
+          Productos
+        </Link>
+
+        <Link
           to="/configuracion"
           className="rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center
                      font-bold text-(--color-primario-texto) transition hover:opacity-90"
