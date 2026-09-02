@@ -1,1 +1,70 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * Sistema de diseño
+ *
+ * Los tokens salen del prototipo acordado por el equipo
+ * (https://comercio-feliz.lovable.app) para que las pantallas que haga cada
+ * uno se vean como una sola app. No inventar colores sueltos en los
+ * componentes: si falta un tono, se agrega acá.
+ *
+ * Tailwind v4: la personalización va en `@theme`, no en un tailwind.config.js.
+ * ------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  --radius: 1rem;
+
+  /* Superficies y texto */
+  --color-fondo: oklch(97.6% 0.012 84);
+  --color-texto: oklch(24% 0.03 60);
+  --color-tarjeta: oklch(99.5% 0.007 90);
+  --color-apagado: oklch(94.5% 0.014 84);
+  --color-texto-apagado: oklch(50% 0.026 68);
+  --color-borde: oklch(90% 0.018 80);
+
+  /* Acción principal */
+  --color-primario: oklch(50% 0.115 250);
+  --color-primario-texto: oklch(99% 0.005 90);
+  --color-primario-suave: oklch(93% 0.03 250);
+
+  /* Estados */
+  --color-exito: oklch(58% 0.13 152);
+  --color-exito-suave: oklch(93% 0.05 152);
+  --color-atencion: oklch(75% 0.14 78);
+  --color-atencion-suave: oklch(95% 0.06 90);
+  --color-peligro: oklch(57% 0.2 25);
+  --color-peligro-texto: oklch(99% 0.005 90);
+  --color-peligro-suave: oklch(94% 0.04 25);
+}
+
+/* El prototipo trae tema oscuro; se respeta la preferencia del sistema. */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-fondo: oklch(22% 0.02 70);
+    --color-texto: oklch(97% 0.01 84);
+    --color-tarjeta: oklch(27% 0.02 70);
+    --color-apagado: oklch(30% 0.02 70);
+    --color-texto-apagado: oklch(72% 0.02 80);
+    --color-borde: oklch(36% 0.02 70);
+
+    --color-primario: oklch(62% 0.13 250);
+    --color-primario-texto: oklch(99% 0.005 90);
+    --color-primario-suave: oklch(35% 0.06 250);
+
+    --color-exito: oklch(65% 0.13 152);
+    --color-exito-suave: oklch(33% 0.06 152);
+    --color-atencion: oklch(78% 0.14 78);
+    --color-atencion-suave: oklch(36% 0.06 80);
+    --color-peligro: oklch(64% 0.19 25);
+    --color-peligro-texto: oklch(99% 0.005 90);
+    --color-peligro-suave: oklch(33% 0.06 25);
+  }
+}
+
+body {
+  background-color: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--font-sans);
+}
