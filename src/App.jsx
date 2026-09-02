@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import RutaProtegida from "./components/RutaProtegida";
+import Configuracion from "./pages/Configuracion";
 import Inicio from "./pages/Inicio";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
@@ -15,6 +16,14 @@ export default function App() {
           element={
             <RutaProtegida>
               <Inicio />
+            </RutaProtegida>
+          }
+        />
+        <Route
+          path="/configuracion"
+          element={
+            <RutaProtegida>
+              <Configuracion />
             </RutaProtegida>
           }
         />
