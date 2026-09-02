@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { useEscanerCodigoBarras } from "../src/hooks/useEscanerCodigoBarras";
+import { useEscanerCodigoBarras } from "./useEscanerCodigoBarras";
 
 vi.mock("@zxing/browser", () => ({
   BarcodeFormat: { EAN_13: 1, EAN_8: 2, UPC_A: 3, UPC_E: 4 },
@@ -30,7 +30,7 @@ describe("useEscanerCodigoBarras", () => {
     const stop = vi.fn();
     BrowserMultiFormatReader.mockImplementation(function () {
       return {
-        decodeFromVideoDevice: vi.fn((deviceId, video, callback) => {
+        decodeFromConstraints: vi.fn((constraints, video, callback) => {
           callbackCapturado = callback;
           return Promise.resolve({ stop });
         }),
@@ -57,7 +57,7 @@ describe("useEscanerCodigoBarras", () => {
   test("permiso de camara denegado -> estado error / permiso-denegado", async () => {
     BrowserMultiFormatReader.mockImplementation(function () {
       return {
-        decodeFromVideoDevice: vi.fn(() => {
+        decodeFromConstraints: vi.fn(() => {
           const error = new Error("denied");
           error.name = "NotAllowedError";
           return Promise.reject(error);
@@ -78,7 +78,7 @@ describe("useEscanerCodigoBarras", () => {
   test("sin camara disponible -> estado error / sin-camara", async () => {
     BrowserMultiFormatReader.mockImplementation(function () {
       return {
-        decodeFromVideoDevice: vi.fn(() => {
+        decodeFromConstraints: vi.fn(() => {
           const error = new Error("not found");
           error.name = "NotFoundError";
           return Promise.reject(error);

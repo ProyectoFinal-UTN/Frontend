@@ -62,11 +62,20 @@ export function useEscanerCodigoBarras() {
 
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, FORMATOS_SOPORTADOS);
+    // Sin esto, zxing se conforma con el primer intento rapido y descarta
+    // codigos legibles a simple vista si no calzan perfecto — hace falta
+    // para escaneo real con webcam, no solo con imagenes de prueba ideales.
+    hints.set(DecodeHintType.TRY_HARDER, true);
     const reader = new BrowserMultiFormatReader(hints);
 
     try {
-      const controls = await reader.decodeFromVideoDevice(
-        undefined, // sin deviceId: zxing prefiere la camara trasera (environment)
+      // Pedir width/height "ideal" acá rompía la captura en algunas webcams
+      // USB (el navegador negocia una resolucion que deja video.videoWidth
+      // en 0 un instante, y zxing no puede crear el canvas para leer el
+      // frame). Sin esos hints, decodeFromConstraints con solo facingMode
+      // es equivalente a decodeFromVideoDevice(undefined, ...).
+      const controls = await reader.decodeFromConstraints(
+        { video: { facingMode: "environment" } },
         videoRef.current,
         (resultado) => {
           if (!resultado) return; // frame sin codigo legible, es lo normal

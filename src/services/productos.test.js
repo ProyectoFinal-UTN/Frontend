@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { verificarCodigoBarras } from "../src/services/productos";
-import { apiFetch } from "../src/services/api";
+import { verificarCodigoBarras } from "./productos";
+import { apiFetch } from "./api";
 
-vi.mock("../src/services/api", () => ({ apiFetch: vi.fn() }));
+vi.mock("./api", () => ({ apiFetch: vi.fn() }));
 
 describe("verificarCodigoBarras", () => {
   beforeEach(() => {

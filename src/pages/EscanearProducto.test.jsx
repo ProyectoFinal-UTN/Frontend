@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import EscanearProducto from "../src/pages/EscanearProducto";
-import { useEscanerCodigoBarras } from "../src/hooks/useEscanerCodigoBarras";
-import { verificarCodigoBarras } from "../src/services/productos";
+import EscanearProducto from "./EscanearProducto";
+import { useEscanerCodigoBarras } from "../hooks/useEscanerCodigoBarras";
+import { verificarCodigoBarras } from "../services/productos";
 
-vi.mock("../src/hooks/useEscanerCodigoBarras");
-vi.mock("../src/services/productos");
+vi.mock("../hooks/useEscanerCodigoBarras");
+vi.mock("../services/productos");
 
 function mockHook(overrides) {
   useEscanerCodigoBarras.mockReturnValue({
