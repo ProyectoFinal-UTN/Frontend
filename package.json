@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "cross-env VITE_LAN_HTTPS=1 vite",
     "build": "vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@zxing/browser": "^0.2.1",
     "better-auth": "^1.7.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -28,8 +30,10 @@
     "@testing-library/user-event": "^14.6.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-v8": "^4.1.11",
+    "cross-env": "^10.1.0",
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
