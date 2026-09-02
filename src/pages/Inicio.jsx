@@ -14,7 +14,8 @@ export default function Inicio() {
 
   async function salir() {
     await cerrarSesion();
-    navegar("/registro", { replace: true });
+    // Al login: quien cierra sesión ya tiene cuenta, no necesita crear otra.
+    navegar("/login", { replace: true });
   }
 
   return (
