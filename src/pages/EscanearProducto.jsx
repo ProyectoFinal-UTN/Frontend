@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useEscanerCodigoBarras } from "../hooks/useEscanerCodigoBarras";
-import { buscarProductoPorCodigoBarras } from "../services/productos";
-import { buscarSugerenciaExterna } from "../services/openFoodFacts";
+import { verificarCodigoBarras } from "../services/productos";
 
 const MENSAJE_ERROR_CAMARA = {
   "permiso-denegado":
@@ -18,7 +17,7 @@ export default function EscanearProducto() {
 
   const [estadoBusqueda, setEstadoBusqueda] = useState("inactivo");
   const [producto, setProducto] = useState(null);
-  const [sugerenciaExterna, setSugerenciaExterna] = useState(null);
+  const [sugerencia, setSugerencia] = useState(null);
 
   useEffect(() => {
     if (!codigo) return;
@@ -28,23 +27,24 @@ export default function EscanearProducto() {
     async function buscar() {
       setEstadoBusqueda("buscando");
       setProducto(null);
-      setSugerenciaExterna(null);
+      setSugerencia(null);
 
       try {
-        const resultado = await buscarProductoPorCodigoBarras(codigo);
+        // GET /api/productos/codigo/:codigoBarras (HU-9): responde siempre
+        // 200, con { existe, producto } o { existe: false, sugerencia }. La
+        // sugerencia de Open Food Facts ya viene armada por el backend, no
+        // hace falta pedirla aparte desde acá.
+        const resultado = await verificarCodigoBarras(codigo);
         if (cancelado) return;
 
-        if (resultado) {
-          setProducto(resultado);
+        if (resultado.existe) {
+          setProducto(resultado.producto);
           setEstadoBusqueda("encontrado");
           return;
         }
 
+        setSugerencia(resultado.sugerencia);
         setEstadoBusqueda("no-encontrado");
-        // Best-effort: no bloquea el estado "no-encontrado", solo lo completa
-        // si llega a tiempo.
-        const sugerencia = await buscarSugerenciaExterna(codigo);
-        if (!cancelado) setSugerenciaExterna(sugerencia);
       } catch {
         if (!cancelado) setEstadoBusqueda("error");
       }
@@ -60,7 +60,7 @@ export default function EscanearProducto() {
   function reintentar() {
     setEstadoBusqueda("inactivo");
     setProducto(null);
-    setSugerenciaExterna(null);
+    setSugerencia(null);
     iniciar();
   }
 
@@ -138,11 +138,11 @@ export default function EscanearProducto() {
             <span className="font-mono">{codigo}</span> en tu comercio.
           </p>
 
-          {sugerenciaExterna && (
+          {sugerencia && (
             <div className="mt-3 p-3 bg-gray-50 rounded text-left text-sm">
               <p className="font-medium">Encontramos esto en Open Food Facts:</p>
-              <p>{sugerenciaExterna.nombre || "Sin nombre"}</p>
-              {sugerenciaExterna.marca && <p>Marca: {sugerenciaExterna.marca}</p>}
+              {sugerencia.nombre && <p>{sugerencia.nombre}</p>}
+              {sugerencia.categoria && <p>Categoría: {sugerencia.categoria}</p>}
               <p className="text-xs text-gray-500 mt-1">
                 Datos de producto:{" "}
                 <a
@@ -160,7 +160,7 @@ export default function EscanearProducto() {
           <button
             type="button"
             disabled
-            title="Disponible cuando se implemente el alta de productos (HU-9)"
+            title="Disponible cuando exista la pantalla de alta de productos en el Frontend"
             className="mt-3 px-4 py-2 rounded bg-gray-300 text-gray-600 cursor-not-allowed"
           >
             Dar de alta

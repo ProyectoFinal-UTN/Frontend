@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import EscanearProducto from "../src/pages/EscanearProducto";
 import { useEscanerCodigoBarras } from "../src/hooks/useEscanerCodigoBarras";
-import { buscarProductoPorCodigoBarras } from "../src/services/productos";
-import { buscarSugerenciaExterna } from "../src/services/openFoodFacts";
+import { verificarCodigoBarras } from "../src/services/productos";
 
 vi.mock("../src/hooks/useEscanerCodigoBarras");
 vi.mock("../src/services/productos");
-vi.mock("../src/services/openFoodFacts");
 
 function mockHook(overrides) {
   useEscanerCodigoBarras.mockReturnValue({
@@ -26,11 +24,11 @@ describe("EscanearProducto", () => {
     vi.clearAllMocks();
   });
 
-  test("muestra el producto cuando el service lo encuentra", async () => {
+  test("muestra el producto cuando el backend responde existe:true", async () => {
     mockHook({ estado: "detectado", codigo: "7791234567890" });
-    buscarProductoPorCodigoBarras.mockResolvedValueOnce({
-      nombre: "Gaseosa 1.5L",
-      codigoBarras: "7791234567890",
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: true,
+      producto: { nombre: "Gaseosa 1.5L", codigoBarras: "7791234567890" },
     });
 
     render(<EscanearProducto />);
@@ -38,10 +36,12 @@ describe("EscanearProducto", () => {
     expect(await screen.findByText("Gaseosa 1.5L")).toBeInTheDocument();
   });
 
-  test("muestra 'no encontrado' con opcion de alta deshabilitada cuando el service devuelve null", async () => {
+  test("muestra 'no encontrado' con opcion de alta deshabilitada cuando existe:false", async () => {
     mockHook({ estado: "detectado", codigo: "0000000000000" });
-    buscarProductoPorCodigoBarras.mockResolvedValueOnce(null);
-    buscarSugerenciaExterna.mockResolvedValueOnce(null);
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: false,
+      sugerencia: null,
+    });
 
     render(<EscanearProducto />);
 
@@ -51,14 +51,11 @@ describe("EscanearProducto", () => {
     expect(screen.getByRole("button", { name: "Dar de alta" })).toBeDisabled();
   });
 
-  test("muestra la tarjeta de Open Food Facts cuando hay sugerencia externa", async () => {
+  test("muestra la tarjeta de Open Food Facts cuando el backend manda una sugerencia", async () => {
     mockHook({ estado: "detectado", codigo: "7791234567890" });
-    buscarProductoPorCodigoBarras.mockResolvedValueOnce(null);
-    buscarSugerenciaExterna.mockResolvedValueOnce({
-      nombre: "Coca-Cola 1.5L",
-      marca: "Coca-Cola",
-      categoria: "Bebidas",
-      imagenUrl: null,
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: false,
+      sugerencia: { nombre: "Coca-Cola 1.5L", categoria: "Bebidas" },
     });
 
     render(<EscanearProducto />);
@@ -69,10 +66,12 @@ describe("EscanearProducto", () => {
     ).toBeInTheDocument();
   });
 
-  test("no muestra la tarjeta externa cuando Open Food Facts no tiene el codigo", async () => {
+  test("no muestra la tarjeta externa cuando el backend no manda sugerencia", async () => {
     mockHook({ estado: "detectado", codigo: "0000000000000" });
-    buscarProductoPorCodigoBarras.mockResolvedValueOnce(null);
-    buscarSugerenciaExterna.mockResolvedValueOnce(null);
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: false,
+      sugerencia: null,
+    });
 
     render(<EscanearProducto />);
 
@@ -84,9 +83,7 @@ describe("EscanearProducto", () => {
 
   test("muestra error generico cuando el service de productos rechaza", async () => {
     mockHook({ estado: "detectado", codigo: "7791234567890" });
-    buscarProductoPorCodigoBarras.mockRejectedValueOnce(
-      new Error("backend caido"),
-    );
+    verificarCodigoBarras.mockRejectedValueOnce(new Error("backend caido"));
 
     render(<EscanearProducto />);
 

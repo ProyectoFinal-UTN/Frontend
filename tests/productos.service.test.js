@@ -1,43 +1,44 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { buscarProductoPorCodigoBarras } from "../src/services/productos";
+import { verificarCodigoBarras } from "../src/services/productos";
 import { apiFetch } from "../src/services/api";
 
 vi.mock("../src/services/api", () => ({ apiFetch: vi.fn() }));
 
-describe("buscarProductoPorCodigoBarras", () => {
+describe("verificarCodigoBarras", () => {
   beforeEach(() => {
     apiFetch.mockReset();
   });
 
-  test("devuelve el producto cuando la api responde", async () => {
-    const producto = { id: "p1", nombre: "Gaseosa 1.5L" };
-    apiFetch.mockResolvedValueOnce({ producto });
+  test("pide GET /productos/codigo/:codigo y devuelve la respuesta tal cual", async () => {
+    const respuesta = {
+      existe: true,
+      producto: { id: "p1", nombre: "Gaseosa 1.5L" },
+    };
+    apiFetch.mockResolvedValueOnce(respuesta);
 
-    const resultado = await buscarProductoPorCodigoBarras("7791234567890");
+    const resultado = await verificarCodigoBarras("7791234567890");
 
-    expect(resultado).toEqual(producto);
-    expect(apiFetch).toHaveBeenCalledWith(
-      "/productos/codigo-barras/7791234567890",
-    );
+    expect(resultado).toEqual(respuesta);
+    expect(apiFetch).toHaveBeenCalledWith("/productos/codigo/7791234567890");
   });
 
-  test("devuelve null cuando el error tiene status 404 (codigo nuevo)", async () => {
-    const error = new Error("Error en la petición: 404");
-    error.status = 404;
-    apiFetch.mockRejectedValueOnce(error);
+  test("devuelve existe:false con la sugerencia cuando el codigo es nuevo", async () => {
+    const respuesta = {
+      existe: false,
+      sugerencia: { nombre: "Coca-Cola 1.5L", categoria: "Bebidas" },
+    };
+    apiFetch.mockResolvedValueOnce(respuesta);
 
-    const resultado = await buscarProductoPorCodigoBarras("0000000000000");
+    const resultado = await verificarCodigoBarras("0000000000000");
 
-    expect(resultado).toBeNull();
+    expect(resultado).toEqual(respuesta);
   });
 
-  test("relanza otros errores (ej. 500 o backend caido)", async () => {
-    const error = new Error("Error en la petición: 500");
-    error.status = 500;
+  test("relanza el error si la request falla (ej. 400 o backend caido)", async () => {
+    const error = new Error("Error en la petición: 400");
+    error.status = 400;
     apiFetch.mockRejectedValueOnce(error);
 
-    await expect(
-      buscarProductoPorCodigoBarras("7791234567890"),
-    ).rejects.toThrow();
+    await expect(verificarCodigoBarras("abc")).rejects.toThrow();
   });
 });
