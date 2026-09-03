@@ -16,6 +16,29 @@ const BOTON_PRIMARIO =
   "rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center " +
   "font-bold text-(--color-primario-texto) transition hover:opacity-90";
 
+/**
+ * Open Food Facts devuelve nombre/categoría en minúsculas
+ * ("puré arcor", "tomate natural triturado"). Se prolija acá, no en el
+ * backend: es puramente cosmético para esta pantalla y para lo que se
+ * precarga en el alta, no algo que el resto de la API deba cargar.
+ *
+ * El nombre se capitaliza palabra por palabra, como un nombre de producto
+ * ("Puré Arcor"); la categoría solo en la primera letra, como una frase
+ * ("Tomate natural triturado") — misma idea que ya usan los placeholders del
+ * formulario de alta ("Coca-Cola 500ml" vs "Bebidas").
+ */
+function capitalizarNombre(texto) {
+  if (!texto) return texto;
+  return texto
+    .split(" ")
+    .map((palabra) => (palabra ? palabra[0].toUpperCase() + palabra.slice(1) : palabra))
+    .join(" ");
+}
+
+function capitalizarCategoria(texto) {
+  return texto ? texto[0].toUpperCase() + texto.slice(1) : texto;
+}
+
 export default function EscanearProducto() {
   const navegar = useNavigate();
   const { videoRef, iniciar, detener, estado, error, codigo } =
@@ -24,6 +47,12 @@ export default function EscanearProducto() {
   const [estadoBusqueda, setEstadoBusqueda] = useState("inactivo");
   const [producto, setProducto] = useState(null);
   const [sugerencia, setSugerencia] = useState(null);
+
+  // Al entrar a esta pantalla se viene específicamente a escanear — pedir la
+  // cámara de una y no hacer que el primer paso sea un click de más.
+  useEffect(() => {
+    iniciar();
+  }, [iniciar]);
 
   useEffect(() => {
     if (!codigo) return;
@@ -49,7 +78,14 @@ export default function EscanearProducto() {
           return;
         }
 
-        setSugerencia(resultado.sugerencia);
+        setSugerencia(
+          resultado.sugerencia
+            ? {
+                nombre: capitalizarNombre(resultado.sugerencia.nombre),
+                categoria: capitalizarCategoria(resultado.sugerencia.categoria),
+              }
+            : null,
+        );
         setEstadoBusqueda("no-encontrado");
       } catch {
         if (!cancelado) setEstadoBusqueda("error");
@@ -76,13 +112,7 @@ export default function EscanearProducto() {
         Escanear código de barras
       </h1>
 
-      {estado === "inactivo" && (
-        <button type="button" onClick={iniciar} className={BOTON_PRIMARIO}>
-          Iniciar escaneo
-        </button>
-      )}
-
-      {estado === "solicitando-permiso" && (
+      {(estado === "inactivo" || estado === "solicitando-permiso") && (
         <p className="text-(--color-texto-apagado)">
           Pidiendo acceso a la cámara...
         </p>
@@ -128,7 +158,10 @@ export default function EscanearProducto() {
 
       {estado === "detectado" && estadoBusqueda === "encontrado" && producto && (
         <div className="w-full rounded-(--radius) border-2 border-(--color-borde) bg-(--color-tarjeta) p-4">
-          <p className="font-bold text-(--color-texto)">{producto.nombre}</p>
+          <p className="font-bold text-(--color-exito)">
+            Este producto ya está en tu catálogo
+          </p>
+          <p className="mt-2 font-bold text-(--color-texto)">{producto.nombre}</p>
           <p className="text-sm text-(--color-texto-apagado)">
             Código: {producto.codigoBarras}
           </p>
@@ -154,7 +187,7 @@ export default function EscanearProducto() {
             <span className="font-mono">{codigo}</span> en tu comercio.
           </p>
 
-          {sugerencia && (
+          {sugerencia ? (
             <div className="mt-3 rounded-(--radius) bg-(--color-apagado) p-3 text-left text-sm">
               <p className="font-bold text-(--color-texto)">
                 Encontramos esto en Open Food Facts:
@@ -179,17 +212,29 @@ export default function EscanearProducto() {
                 </a>
               </p>
             </div>
+          ) : (
+            <p className="mt-3 text-sm text-(--color-texto-apagado)">
+              Tampoco lo encontramos en Open Food Facts. Podés cargarlo a mano.
+            </p>
           )}
 
           <button
             type="button"
-            // /productos?nuevo=<codigo> (HU-9): abre el catálogo con el alta
-            // ya desplegada y el código puesto. Se consume una sola vez del
-            // otro lado, no hace falta limpiar nada acá.
-            onClick={() => navegar(`/productos?nuevo=${codigo}`)}
+            // /productos?nuevo=<codigo>[&nombre=...&categoria=...] (HU-9):
+            // abre el catálogo con el alta ya desplegada. Sin sugerencia el
+            // formulario arranca vacío en nombre/categoria (el usuario los
+            // tipea a mano) — con ella, ya vienen precargados. Se consume una
+            // sola vez del otro lado, no hace falta limpiar nada acá.
+            onClick={() => {
+              const parametros = new URLSearchParams({ nuevo: codigo });
+              if (sugerencia?.nombre) parametros.set("nombre", sugerencia.nombre);
+              if (sugerencia?.categoria)
+                parametros.set("categoria", sugerencia.categoria);
+              navegar(`/productos?${parametros.toString()}`);
+            }}
             className={`${BOTON_PRIMARIO} mt-3 w-full`}
           >
-            Dar de alta
+            {sugerencia ? "Dar de alta" : "Cargar a mano"}
           </button>
 
           <button
@@ -220,7 +265,14 @@ export default function EscanearProducto() {
       {(estado === "escaneando" || estado === "solicitando-permiso") && (
         <button
           type="button"
-          onClick={detener}
+          // Solo apagar la cámara dejaba la pantalla en "inactivo" sin salida:
+          // el efecto que la prende arranca una sola vez al montar, así que
+          // no hay forma de volver a pedirla desde acá sin recargar. Cancelar
+          // tiene que sacar a la persona de esta pantalla, no dejarla varada.
+          onClick={() => {
+            detener();
+            navegar(-1);
+          }}
           className="text-sm text-(--color-texto-apagado) underline"
         >
           Cancelar

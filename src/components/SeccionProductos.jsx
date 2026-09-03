@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Campo from "./Campo";
 import {
   UNIDADES_MEDIDA,
@@ -341,15 +342,29 @@ export default function SeccionProductos({
   productos,
   alRecargar,
   codigoInicial = "",
+  nombreInicial = "",
+  categoriaInicial = "",
   alConsumirCodigo,
 }) {
   // `null` = ningún formulario abierto; `{ modo, inicial }` = el que se ve.
   // Si se llegó con `?nuevo=<codigo>` (desde el escáner de HU-10), el alta
-  // arranca abierta con el código ya puesto.
+  // arranca abierta con el código ya puesto — y, si el escáner encontró una
+  // sugerencia en Open Food Facts, con nombre/categoría también precargados,
+  // para no hacer retipear lo que ya se le mostró al usuario.
   const [formulario, setFormulario] = useState(
-    codigoInicial ? { modo: "alta", inicial: { codigoBarras: codigoInicial } } : null,
+    codigoInicial
+      ? {
+          modo: "alta",
+          inicial: {
+            codigoBarras: codigoInicial,
+            ...(nombreInicial && { nombre: nombreInicial }),
+            ...(categoriaInicial && { categoria: categoriaInicial }),
+          },
+        }
+      : null,
   );
   const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
 
   // El código del escáner se usa una sola vez. Sin avisar que ya se consumió,
@@ -360,6 +375,30 @@ export default function SeccionProductos({
   useEffect(() => {
     if (codigoInicial) alConsumirCodigo?.();
   }, [codigoInicial, alConsumirCodigo]);
+
+  // El aviso de "se dio de alta" es sobre la operación que se acaba de
+  // terminar, no sobre la que arranca ahora: se limpia en los dos lugares
+  // donde se abre un formulario nuevo (alta manual, edición), no con un
+  // efecto — total, es la misma actualización que ya cambia `formulario`.
+  function abrirAltaManual() {
+    setMensaje("");
+    setFormulario({ modo: "alta", inicial: {} });
+  }
+
+  function abrirEdicion(producto) {
+    setMensaje("");
+    setFormulario({
+      modo: "edicion",
+      inicial: {
+        id: producto.id,
+        codigoBarras: producto.codigoBarras,
+        nombre: producto.nombre,
+        categoria: producto.categoria,
+        unidadMedida: producto.unidadMedida,
+        umbralMinimo: String(producto.umbralMinimo),
+      },
+    });
+  }
 
   /**
    * Corre una operación contra el backend y recarga la lista.
@@ -378,6 +417,7 @@ export default function SeccionProductos({
    */
   async function ejecutar(operacion) {
     setError("");
+    setMensaje("");
     setGuardando(true);
 
     try {
@@ -402,6 +442,9 @@ export default function SeccionProductos({
 
     if (!fallo) {
       setFormulario(null);
+      if (!esEdicion) {
+        setMensaje(`«${datos.nombre}» se dio de alta correctamente.`);
+      }
       return null;
     }
 
@@ -441,16 +484,38 @@ export default function SeccionProductos({
           </p>
         </div>
         {!formulario && (
-          <button
-            type="button"
-            disabled={guardando}
-            onClick={() => setFormulario({ modo: "alta", inicial: {} })}
-            className={CLASES_BOTON_PRIMARIO}
-          >
-            + Nuevo producto
-          </button>
+          <div className="flex gap-2">
+            {/*
+              Dos formas de arrancar el alta: escanear (manda a HU-10, que
+              trae el código y, si lo encuentra en Open Food Facts, nombre y
+              categoría también) o cargar todo a mano acá mismo. Van juntas
+              porque son la misma acción con dos puntos de partida distintos,
+              no dos cosas separadas.
+            */}
+            <Link to="/productos/escanear" className={CLASES_BOTON_PRIMARIO}>
+              Escanear código
+            </Link>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={abrirAltaManual}
+              className={CLASES_BOTON_PRIMARIO}
+            >
+              + Cargar a mano
+            </button>
+          </div>
         )}
       </div>
+
+      {mensaje && (
+        <p
+          role="status"
+          className="mt-4 rounded-(--radius) bg-(--color-exito-suave) px-4 py-3
+                     text-sm font-semibold text-(--color-exito)"
+        >
+          {mensaje}
+        </p>
+      )}
 
       {error && (
         <p
@@ -486,19 +551,7 @@ export default function SeccionProductos({
               key={producto.id}
               producto={producto}
               guardando={guardando}
-              alEditar={(elegido) =>
-                setFormulario({
-                  modo: "edicion",
-                  inicial: {
-                    id: elegido.id,
-                    codigoBarras: elegido.codigoBarras,
-                    nombre: elegido.nombre,
-                    categoria: elegido.categoria,
-                    unidadMedida: elegido.unidadMedida,
-                    umbralMinimo: String(elegido.umbralMinimo),
-                  },
-                })
-              }
+              alEditar={abrirEdicion}
               alEliminar={eliminar}
             />
           ))}
