@@ -119,6 +119,25 @@ describe("validarProducto", () => {
     });
   });
 
+  describe("campos ausentes", () => {
+    test("no revienta si el texto viene undefined o null", () => {
+      // El schema del backend hace que hoy esto no llegue, pero el formulario
+      // arma sus valores con un spread: si el contrato cambiara, un undefined
+      // pisaria el "" por defecto y el .trim() tiraria un TypeError que deja
+      // el boton Guardar muerto, sin ningun mensaje.
+      const errores = validarProducto({
+        ...VALIDO,
+        codigoBarras: undefined,
+        nombre: null,
+        categoria: undefined,
+      });
+
+      expect(errores.codigoBarras).toBe("Ingresá el código de barras.");
+      expect(errores.nombre).toBe("Ingresá el nombre del producto.");
+      expect(errores.categoria).toBe("Ingresá una categoría.");
+    });
+  });
+
   describe("modo edicion", () => {
     test("no pide stock inicial, porque el PUT no lo acepta", () => {
       const errores = validarProducto(

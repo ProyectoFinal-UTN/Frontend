@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Campo from "./Campo";
 import {
   UNIDADES_MEDIDA,
@@ -341,6 +341,7 @@ export default function SeccionProductos({
   productos,
   alRecargar,
   codigoInicial = "",
+  alConsumirCodigo,
 }) {
   // `null` = ningún formulario abierto; `{ modo, inicial }` = el que se ve.
   // Si se llegó con `?nuevo=<codigo>` (desde el escáner de HU-10), el alta
@@ -350,6 +351,15 @@ export default function SeccionProductos({
   );
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  // El código del escáner se usa una sola vez. Sin avisar que ya se consumió,
+  // un remonte de esta sección —la página la desmonta ante un error de carga,
+  // así que el «Reintentar» la vuelve a montar— reabriría el alta con un
+  // código que a esa altura quizá ya se dio de alta, y guardar devolvería un
+  // 409 que el usuario no pidió.
+  useEffect(() => {
+    if (codigoInicial) alConsumirCodigo?.();
+  }, [codigoInicial, alConsumirCodigo]);
 
   /**
    * Corre una operación contra el backend y recarga la lista.

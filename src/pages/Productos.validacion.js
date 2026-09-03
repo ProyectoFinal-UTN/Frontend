@@ -30,21 +30,21 @@ export const MAXIMO_ENTERO = 2147483647;
 export function validarProducto(campos, { esEdicion = false } = {}) {
   const errores = {};
 
-  const codigoBarras = campos.codigoBarras.trim();
+  const codigoBarras = texto(campos.codigoBarras);
   if (!codigoBarras) {
     errores.codigoBarras = "Ingresá el código de barras.";
   } else if (!FORMATO_CODIGO_BARRAS.test(codigoBarras)) {
     errores.codigoBarras = "Tiene que ser de 6 a 64 dígitos, sin letras.";
   }
 
-  const nombre = campos.nombre.trim();
+  const nombre = texto(campos.nombre);
   if (!nombre) {
     errores.nombre = "Ingresá el nombre del producto.";
   } else if (nombre.length > LARGO_MAXIMO_NOMBRE) {
     errores.nombre = `No puede superar los ${LARGO_MAXIMO_NOMBRE} caracteres.`;
   }
 
-  const categoria = campos.categoria.trim();
+  const categoria = texto(campos.categoria);
   if (!categoria) {
     errores.categoria = "Ingresá una categoría.";
   } else if (categoria.length > LARGO_MAXIMO_CATEGORIA) {
@@ -68,6 +68,22 @@ export function validarProducto(campos, { esEdicion = false } = {}) {
   }
 
   return errores;
+}
+
+/**
+ * Recorta un campo de texto sin asumir que llegó un string.
+ *
+ * Hoy los tres campos que la usan vienen siempre poblados: `nombre`,
+ * `codigoBarras` y `categoria` son `notNull` en el schema y el backend los
+ * devuelve en todas las respuestas. La coerción es una red por si ese contrato
+ * cambia, no la evidencia de que la API devuelva nulos: el formulario arma sus
+ * valores con `{...CAMPOS_VACIOS, ...inicial}`, y un spread deja pasar un
+ * `undefined` por encima del `""` por defecto. Sin esto, ese caso reventaría
+ * con un TypeError que deja el botón «Guardar» muerto, sin alerta ni error de
+ * campo que explique nada.
+ */
+function texto(valor) {
+  return String(valor ?? "").trim();
 }
 
 /**
