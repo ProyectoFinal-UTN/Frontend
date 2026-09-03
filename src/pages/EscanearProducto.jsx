@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useEscanerCodigoBarras } from "../hooks/useEscanerCodigoBarras";
 import { verificarCodigoBarras } from "../services/productos";
 
@@ -16,6 +17,7 @@ const BOTON_PRIMARIO =
   "font-bold text-(--color-primario-texto) transition hover:opacity-90";
 
 export default function EscanearProducto() {
+  const navegar = useNavigate();
   const { videoRef, iniciar, detener, estado, error, codigo } =
     useEscanerCodigoBarras();
 
@@ -181,10 +183,11 @@ export default function EscanearProducto() {
 
           <button
             type="button"
-            disabled
-            title="Disponible cuando exista la pantalla de alta de productos en el Frontend"
-            className="mt-3 w-full cursor-not-allowed rounded-(--radius) bg-(--color-apagado)
-                       px-4 py-3 font-bold text-(--color-texto-apagado)"
+            // /productos?nuevo=<codigo> (HU-9): abre el catálogo con el alta
+            // ya desplegada y el código puesto. Se consume una sola vez del
+            // otro lado, no hace falta limpiar nada acá.
+            onClick={() => navegar(`/productos?nuevo=${codigo}`)}
+            className={`${BOTON_PRIMARIO} mt-3 w-full`}
           >
             Dar de alta
           </button>

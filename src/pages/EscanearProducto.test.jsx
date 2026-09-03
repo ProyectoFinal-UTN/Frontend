@@ -7,6 +7,9 @@ import { verificarCodigoBarras } from "../services/productos";
 vi.mock("../hooks/useEscanerCodigoBarras");
 vi.mock("../services/productos");
 
+const mockNavegar = vi.fn();
+vi.mock("react-router-dom", () => ({ useNavigate: () => mockNavegar }));
+
 function mockHook(overrides) {
   useEscanerCodigoBarras.mockReturnValue({
     videoRef: { current: null },
@@ -36,7 +39,7 @@ describe("EscanearProducto", () => {
     expect(await screen.findByText("Gaseosa 1.5L")).toBeInTheDocument();
   });
 
-  test("muestra 'no encontrado' con opcion de alta deshabilitada cuando existe:false", async () => {
+  test("muestra 'no encontrado' con opcion de dar de alta cuando existe:false", async () => {
     mockHook({ estado: "detectado", codigo: "0000000000000" });
     verificarCodigoBarras.mockResolvedValueOnce({
       existe: false,
@@ -48,7 +51,24 @@ describe("EscanearProducto", () => {
     expect(
       await screen.findByText(/No encontramos ningún producto/),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Dar de alta" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Dar de alta" }),
+    ).not.toBeDisabled();
+  });
+
+  test("'Dar de alta' navega a /productos?nuevo=<codigo> (HU-9)", async () => {
+    mockHook({ estado: "detectado", codigo: "0000000000000" });
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: false,
+      sugerencia: null,
+    });
+
+    render(<EscanearProducto />);
+
+    const boton = await screen.findByRole("button", { name: "Dar de alta" });
+    boton.click();
+
+    expect(mockNavegar).toHaveBeenCalledWith("/productos?nuevo=0000000000000");
   });
 
   test("muestra la tarjeta de Open Food Facts cuando el backend manda una sugerencia", async () => {
