@@ -113,6 +113,28 @@ describe("Llegar desde el escáner", () => {
     expect(screen.queryByLabelText(/código de barras/i)).not.toBeInTheDocument();
   });
 
+  test("precarga nombre/categoria si vienen junto con ?nuevo= (sugerencia de Open Food Facts)", async () => {
+    renderizar(
+      "/productos?nuevo=7790580146115&nombre=pur%C3%A9%20arcor&categoria=Tomate",
+    );
+
+    expect(await screen.findByLabelText(/código de barras/i)).toHaveValue(
+      "7790580146115",
+    );
+    expect(screen.getByLabelText(/nombre/i)).toHaveValue("puré arcor");
+    expect(screen.getByLabelText(/categoría/i)).toHaveValue("Tomate");
+  });
+
+  test("nombre/categoria tambien desaparecen de la URL una vez usados", async () => {
+    renderizar("/productos?nuevo=7790580146115&nombre=puré+arcor&categoria=Tomate");
+
+    await screen.findByLabelText(/código de barras/i);
+
+    const query = screen.getByTestId("query").textContent;
+    expect(query).not.toContain("nombre=");
+    expect(query).not.toContain("categoria=");
+  });
+
   test("el código desaparece de la URL una vez usado", async () => {
     renderizar("/productos?nuevo=7791234567890&otro=1");
 
