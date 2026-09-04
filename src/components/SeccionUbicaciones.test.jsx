@@ -224,6 +224,61 @@ describe("Eliminar", () => {
   });
 });
 
+describe("Según el rol", () => {
+  test("un empleado ve las ubicaciones pero no puede tocarlas", () => {
+    // Las necesita para elegir dónde registrar un movimiento, así que la
+    // lista se muestra igual; lo que desaparece son los controles.
+    render(
+      <SeccionUbicaciones
+        configuracion={{
+          moneda: "ARS",
+          ubicaciones: [{ id: "u1", nombre: "Depósito" }],
+        }}
+        alRecargar={alRecargar}
+        puedeEditarUbicaciones={false}
+        puedeEditarMoneda={false}
+      />,
+    );
+
+    expect(screen.getByText("Depósito")).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Renombrar Depósito" }),
+    ).not.toBeInTheDocument();
+    // El formulario va con `hidden`, así que queda fuera del árbol de
+    // accesibilidad: un lector de pantalla tampoco lo anuncia.
+    expect(
+      screen.queryByRole("button", { name: "Agregar" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/moneda del negocio/i)).toBeDisabled();
+    expect(
+      screen.getByText(/puede consultarlas, pero no modificarlas/i),
+    ).toBeInTheDocument();
+  });
+
+  test("un gerente edita ubicaciones pero no la moneda", () => {
+    render(
+      <SeccionUbicaciones
+        configuracion={{
+          moneda: "ARS",
+          ubicaciones: [{ id: "u1", nombre: "Depósito" }],
+        }}
+        alRecargar={alRecargar}
+        puedeEditarUbicaciones
+        puedeEditarMoneda={false}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Renombrar Depósito" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/moneda del negocio/i)).toBeDisabled();
+    expect(
+      screen.getByText(/solo el propietario puede cambiarla/i),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("Moneda", () => {
   test("muestra la moneda actual del comercio", () => {
     renderizar({ moneda: "USD" });

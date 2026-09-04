@@ -89,11 +89,10 @@ describe("Armazón de la pantalla", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(
-      await screen.findByRole("tab", { name: "Usuarios y roles" }),
-    );
+    // Auditoría es la única que queda pendiente.
+    await usuario.click(await screen.findByRole("tab", { name: "Auditoría" }));
 
-    expect(screen.getByText(/se construye en HU-4/i)).toBeInTheDocument();
+    expect(screen.getByText(/se construye en HU-5/i)).toBeInTheDocument();
   });
 
   test("cambiar de pestaña cambia el contenido", async () => {
