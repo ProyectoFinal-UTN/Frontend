@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
+import SeccionAuditoria from "../components/SeccionAuditoria";
 import SeccionPerfil from "../components/SeccionPerfil";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
 import SeccionUsuarios from "../components/SeccionUsuarios";
@@ -11,30 +12,18 @@ import { obtenerPerfil } from "../services/comercio";
 /**
  * Configuración del comercio.
  *
- * El armazón con las cuatro secciones queda armado acá aunque no todas estén
- * construidas: así quien tome HU-5 rellena su pestaña en vez de rehacer la
- * pantalla.
+ * Las cuatro secciones del prototipo, ya completas: perfil (HU-6), ubicaciones
+ * y moneda (HU-8), usuarios y roles (HU-4) y auditoría (HU-5).
  */
 
 const SECCIONES = [
-  { id: "perfil", etiqueta: "Perfil del comercio", hu: null },
-  { id: "ubicaciones", etiqueta: "Ubicaciones y moneda", hu: null },
-  { id: "usuarios", etiqueta: "Usuarios y roles", hu: null },
-  { id: "auditoria", etiqueta: "Auditoría", hu: "HU-5" },
+  { id: "perfil", etiqueta: "Perfil del comercio" },
+  { id: "ubicaciones", etiqueta: "Ubicaciones y moneda" },
+  { id: "usuarios", etiqueta: "Usuarios y roles" },
+  { id: "auditoria", etiqueta: "Auditoría" },
 ];
 
 const SECCION_POR_DEFECTO = "perfil";
-
-function Pendiente({ etiqueta, hu }) {
-  return (
-    <div className="rounded-(--radius) bg-(--color-apagado) px-4 py-8 text-center">
-      <p className="font-bold text-(--color-texto)">{etiqueta}</p>
-      <p className="mt-1 text-sm text-(--color-texto-apagado)">
-        Esta sección se construye en {hu}.
-      </p>
-    </div>
-  );
-}
 
 export default function Configuracion() {
   const [parametros, setParametros] = useSearchParams();
@@ -89,8 +78,6 @@ export default function Configuracion() {
   useEffect(() => {
     cargar();
   }, [cargar]);
-
-  const seccion = SECCIONES.find((s) => s.id === activa);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
@@ -167,9 +154,11 @@ export default function Configuracion() {
               />
             )}
 
-            {seccion.hu && (
-              <Pendiente etiqueta={seccion.etiqueta} hu={seccion.hu} />
-            )}
+            {/*
+              La auditoría no recibe el rol: solo la puede leer el propietario y
+              eso lo decide el backend. Si otro rol entra, se muestra su 403.
+            */}
+            {activa === "auditoria" && <SeccionAuditoria />}
           </>
         )}
       </div>

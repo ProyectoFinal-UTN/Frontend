@@ -85,14 +85,21 @@ describe("Armazón de la pantalla", () => {
     ).toHaveAttribute("aria-selected", "true");
   });
 
-  test("las secciones sin construir dicen qué HU las va a traer", async () => {
+  test("ya no queda ninguna sección sin construir", async () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    // Auditoría es la única que queda pendiente.
-    await usuario.click(await screen.findByRole("tab", { name: "Auditoría" }));
-
-    expect(screen.getByText(/se construye en HU-5/i)).toBeInTheDocument();
+    // Con HU-5 se completó la última. Si alguien agrega una pestaña nueva sin
+    // contenido, este test lo detecta.
+    for (const etiqueta of [
+      "Perfil del comercio",
+      "Ubicaciones y moneda",
+      "Usuarios y roles",
+      "Auditoría",
+    ]) {
+      await usuario.click(await screen.findByRole("tab", { name: etiqueta }));
+      expect(screen.queryByText(/se construye en/i)).not.toBeInTheDocument();
+    }
   });
 
   test("cambiar de pestaña cambia el contenido", async () => {
