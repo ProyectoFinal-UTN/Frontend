@@ -6,6 +6,7 @@ import Inicio from "./pages/Inicio";
 import Login from "./pages/Login";
 import Productos from "./pages/Productos";
 import Registro from "./pages/Registro";
+import RegistrarMovimiento from "./pages/RegistrarMovimiento";
 
 export default function App() {
   return (
@@ -42,6 +43,14 @@ export default function App() {
           element={
             <RutaProtegida>
               <EscanearProducto />
+            </RutaProtegida>
+          }
+        />
+        <Route
+          path="/movimientos/nuevo"
+          element={
+            <RutaProtegida>
+              <RegistrarMovimiento />
             </RutaProtegida>
           }
         />

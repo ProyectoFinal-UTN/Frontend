@@ -29,6 +29,19 @@ export default function Inicio() {
       </p>
 
       <div className="mt-8 flex flex-col gap-3">
+        {/*
+          Primera acción de la pantalla a propósito: registrar un movimiento es
+          lo que más se hace en el día a día, y RNF1 pide llegar en ~3 pasos
+          desde acá. Este link es el paso 1.
+        */}
+        <Link
+          to="/movimientos/nuevo"
+          className="rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center
+                     font-bold text-(--color-primario-texto) transition hover:opacity-90"
+        >
+          Registrar movimiento
+        </Link>
+
         <Link
           to="/productos"
           className="rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center
