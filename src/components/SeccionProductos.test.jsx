@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import SeccionProductos from "./SeccionProductos";
 
 // El service es la única puerta a la API, así que es lo único que se mockea.
@@ -40,11 +41,13 @@ const PRODUCTOS = [
 
 function renderizar(props = {}) {
   return render(
-    <SeccionProductos
-      productos={PRODUCTOS}
-      alRecargar={alRecargar}
-      {...props}
-    />,
+    <MemoryRouter>
+      <SeccionProductos
+        productos={PRODUCTOS}
+        alRecargar={alRecargar}
+        {...props}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -103,6 +106,14 @@ describe("Listado", () => {
     await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
 
     expect(screen.getByLabelText(/código de barras/i)).toBeInTheDocument();
+  });
+
+  test("cada producto linkea a su detalle de stock (HU-11)", () => {
+    renderizar();
+
+    expect(
+      screen.getByRole("link", { name: "Ver stock de Coca-Cola 500ml" }),
+    ).toHaveAttribute("href", "/productos/p1");
   });
 });
 

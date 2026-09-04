@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EscanearProducto from "./EscanearProducto";
 import { useEscanerCodigoBarras } from "../hooks/useEscanerCodigoBarras";
 import { verificarCodigoBarras } from "../services/productos";
@@ -19,6 +21,17 @@ function mockHook(overrides) {
   });
 }
 
+function renderizar() {
+  return render(
+    <MemoryRouter initialEntries={["/productos/escanear"]}>
+      <Routes>
+        <Route path="/productos/escanear" element={<EscanearProducto />} />
+        <Route path="/productos/:id" element={<p>Detalle del producto</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe("EscanearProducto", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,9 +44,29 @@ describe("EscanearProducto", () => {
       producto: { nombre: "Gaseosa 1.5L", codigoBarras: "7791234567890" },
     });
 
-    render(<EscanearProducto />);
+    renderizar();
 
     expect(await screen.findByText("Gaseosa 1.5L")).toBeInTheDocument();
+  });
+
+  test("'Ver detalle' navega a /productos/:id", async () => {
+    const usuario = userEvent.setup();
+    mockHook({ estado: "detectado", codigo: "7791234567890" });
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: true,
+      producto: {
+        id: "p1",
+        nombre: "Gaseosa 1.5L",
+        codigoBarras: "7791234567890",
+      },
+    });
+
+    renderizar();
+
+    const boton = await screen.findByRole("button", { name: "Ver detalle" });
+    await usuario.click(boton);
+
+    expect(await screen.findByText("Detalle del producto")).toBeInTheDocument();
   });
 
   test("muestra 'no encontrado' con opcion de alta deshabilitada cuando existe:false", async () => {
@@ -43,7 +76,7 @@ describe("EscanearProducto", () => {
       sugerencia: null,
     });
 
-    render(<EscanearProducto />);
+    renderizar();
 
     expect(
       await screen.findByText(/No encontramos ningún producto/),
@@ -58,7 +91,7 @@ describe("EscanearProducto", () => {
       sugerencia: { nombre: "Coca-Cola 1.5L", categoria: "Bebidas" },
     });
 
-    render(<EscanearProducto />);
+    renderizar();
 
     expect(await screen.findByText("Coca-Cola 1.5L")).toBeInTheDocument();
     expect(
@@ -73,7 +106,7 @@ describe("EscanearProducto", () => {
       sugerencia: null,
     });
 
-    render(<EscanearProducto />);
+    renderizar();
 
     await screen.findByText(/No encontramos ningún producto/);
     expect(
@@ -85,7 +118,7 @@ describe("EscanearProducto", () => {
     mockHook({ estado: "detectado", codigo: "7791234567890" });
     verificarCodigoBarras.mockRejectedValueOnce(new Error("backend caido"));
 
-    render(<EscanearProducto />);
+    renderizar();
 
     expect(
       await screen.findByText(/No pudimos conectar con el servidor/),
@@ -95,7 +128,7 @@ describe("EscanearProducto", () => {
   test("muestra el mensaje especifico cuando el hook reporta permiso denegado", () => {
     mockHook({ estado: "error", error: "permiso-denegado" });
 
-    render(<EscanearProducto />);
+    renderizar();
 
     expect(
       screen.getByText(/No diste permiso para usar la cámara/),
@@ -105,7 +138,7 @@ describe("EscanearProducto", () => {
   test("muestra el mensaje de contexto inseguro cuando falta HTTPS", () => {
     mockHook({ estado: "error", error: "contexto-inseguro" });
 
-    render(<EscanearProducto />);
+    renderizar();
 
     expect(
       screen.getByText(/requiere una conexión segura/),

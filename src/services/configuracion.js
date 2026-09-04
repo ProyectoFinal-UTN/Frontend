@@ -35,6 +35,17 @@ export function cambiarMoneda(moneda) {
   });
 }
 
+/**
+ * Solo las ubicaciones, para las pantallas que necesitan elegir una y no el
+ * resto de la configuración (el registro de movimientos de HU-13).
+ *
+ * El backend deja leer este endpoint a los tres roles, justamente porque
+ * registrar un movimiento requiere elegir la ubicación.
+ */
+export function obtenerUbicaciones() {
+  return apiFetch("/ubicaciones");
+}
+
 export function crearUbicacion(nombre) {
   return apiFetch("/ubicaciones", {
     method: "POST",

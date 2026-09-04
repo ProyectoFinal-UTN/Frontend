@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useEscanerCodigoBarras } from "../hooks/useEscanerCodigoBarras";
 import { verificarCodigoBarras } from "../services/productos";
 
@@ -16,6 +17,7 @@ const BOTON_PRIMARIO =
   "font-bold text-(--color-primario-texto) transition hover:opacity-90";
 
 export default function EscanearProducto() {
+  const navegar = useNavigate();
   const { videoRef, iniciar, detener, estado, error, codigo } =
     useEscanerCodigoBarras();
 
@@ -137,8 +139,17 @@ export default function EscanearProducto() {
           )}
           <button
             type="button"
-            onClick={reintentar}
+            onClick={() => navegar(`/productos/${producto.id}`)}
             className={`${BOTON_PRIMARIO} mt-3 w-full`}
+          >
+            Ver detalle
+          </button>
+          <button
+            type="button"
+            onClick={reintentar}
+            className="mt-2 w-full rounded-(--radius) border-2 border-(--color-borde)
+                       bg-(--color-tarjeta) px-4 py-3 font-bold text-(--color-texto)
+                       transition hover:border-(--color-primario)"
           >
             Escanear otro
           </button>
