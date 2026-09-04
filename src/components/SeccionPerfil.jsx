@@ -54,7 +54,11 @@ function aFormulario(perfil) {
   };
 }
 
-export default function SeccionPerfil({ perfil, alGuardar }) {
+export default function SeccionPerfil({
+  perfil,
+  alGuardar,
+  puedeEditar = true,
+}) {
   const [campos, setCampos] = useState(() => aFormulario(perfil));
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState("");
@@ -108,7 +112,9 @@ export default function SeccionPerfil({ perfil, alGuardar }) {
           Datos del negocio
         </h2>
         <p className="mt-1 text-sm text-(--color-texto-apagado)">
-          Se usan para identificar tu comercio dentro del sistema.
+          {puedeEditar
+            ? "Se usan para identificar tu comercio dentro del sistema."
+            : "Solo el propietario puede modificarlos."}
         </p>
       </div>
 
@@ -137,6 +143,7 @@ export default function SeccionPerfil({ perfil, alGuardar }) {
         etiqueta="Nombre del negocio"
         value={campos.nombre}
         onChange={alEscribir}
+        readOnly={!puedeEditar}
         error={errores.nombre}
         placeholder="Kiosco Don Pepe"
       />
@@ -147,6 +154,7 @@ export default function SeccionPerfil({ perfil, alGuardar }) {
         ayuda="A qué se dedica: kiosco, almacén, ferretería…"
         value={campos.rubro}
         onChange={alEscribir}
+        readOnly={!puedeEditar}
         error={errores.rubro}
         placeholder="Kiosco"
       />
@@ -156,6 +164,7 @@ export default function SeccionPerfil({ perfil, alGuardar }) {
         etiqueta="Dirección (opcional)"
         value={campos.direccion}
         onChange={alEscribir}
+        readOnly={!puedeEditar}
         error={errores.direccion}
         placeholder="Av. Siempreviva 742"
       />
@@ -167,6 +176,7 @@ export default function SeccionPerfil({ perfil, alGuardar }) {
         inputMode="tel"
         value={campos.telefono}
         onChange={alEscribir}
+        readOnly={!puedeEditar}
         error={errores.telefono}
         placeholder="351 123 4567"
       />
@@ -179,21 +189,24 @@ export default function SeccionPerfil({ perfil, alGuardar }) {
         inputMode="email"
         value={campos.correoContacto}
         onChange={alEscribir}
+        readOnly={!puedeEditar}
         error={errores.correoContacto}
         placeholder="contacto@mikiosco.com"
       />
 
-      <button
-        type="submit"
-        disabled={guardando}
-        className="w-full rounded-(--radius) bg-(--color-primario) px-4 py-3.5
-                   text-base font-bold text-(--color-primario-texto) transition
-                   hover:opacity-90 focus:outline-none focus:ring-4
-                   focus:ring-(--color-primario-suave) disabled:opacity-60
-                   sm:w-auto sm:self-start sm:px-8"
-      >
-        {guardando ? "Guardando…" : "Guardar cambios"}
-      </button>
+      {puedeEditar && (
+        <button
+          type="submit"
+          disabled={guardando}
+          className="w-full rounded-(--radius) bg-(--color-primario) px-4 py-3.5
+                     text-base font-bold text-(--color-primario-texto) transition
+                     hover:opacity-90 focus:outline-none focus:ring-4
+                     focus:ring-(--color-primario-suave) disabled:opacity-60
+                     sm:w-auto sm:self-start sm:px-8"
+        >
+          {guardando ? "Guardando…" : "Guardar cambios"}
+        </button>
+      )}
     </form>
   );
 }
