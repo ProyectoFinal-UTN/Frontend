@@ -111,6 +111,19 @@ export default function Login() {
           </button>
         </form>
 
+        {/*
+          Va debajo del formulario y no arriba: quien entra bien no necesita
+          verlo, y quien no puede entrar ya está mirando para acá (HU-3).
+        */}
+        <p className="mt-4 text-center text-sm">
+          <Link
+            to="/recuperar"
+            className="font-bold text-(--color-primario) underline"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+
         <p className="mt-6 text-center text-sm text-(--color-texto-apagado)">
           ¿Todavía no tenés cuenta?{" "}
           <Link

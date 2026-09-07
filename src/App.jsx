@@ -6,8 +6,10 @@ import Inicio from "./pages/Inicio";
 import Invitacion from "./pages/Invitacion";
 import Login from "./pages/Login";
 import Productos from "./pages/Productos";
+import Recuperar from "./pages/Recuperar";
 import Registro from "./pages/Registro";
 import RegistrarMovimiento from "./pages/RegistrarMovimiento";
+import Restablecer from "./pages/Restablecer";
 
 export default function App() {
   return (
@@ -15,6 +17,12 @@ export default function App() {
       <Routes>
         <Route path="/registro" element={<Registro />} />
         <Route path="/login" element={<Login />} />
+        {/*
+          Las dos de recuperación van sin RutaProtegida por definición: quien
+          las usa es justamente alguien que no puede entrar (HU-3).
+        */}
+        <Route path="/recuperar" element={<Recuperar />} />
+        <Route path="/restablecer" element={<Restablecer />} />
         {/* Sin RutaProtegida: quien recibe el link puede no tener cuenta. */}
         <Route path="/invitacion/:id" element={<Invitacion />} />
         <Route
