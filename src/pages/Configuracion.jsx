@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
 import SeccionAuditoria from "../components/SeccionAuditoria";
+import SeccionMiCuenta from "../components/SeccionMiCuenta";
 import SeccionPerfil from "../components/SeccionPerfil";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
 import SeccionUsuarios from "../components/SeccionUsuarios";
@@ -14,6 +15,11 @@ import { obtenerPerfil } from "../services/comercio";
  *
  * Las cuatro secciones del prototipo, ya completas: perfil (HU-6), ubicaciones
  * y moneda (HU-8), usuarios y roles (HU-4) y auditoría (HU-5).
+ *
+ * "Mis datos" (HU-31) es una quinta que el prototipo no tenía. Va última y
+ * separada de las otras a propósito: las cuatro primeras son del comercio y
+ * dependen del rol, y esa es de la persona —los mismos derechos para todos,
+ * incluido el empleado—.
  */
 
 const SECCIONES = [
@@ -21,6 +27,7 @@ const SECCIONES = [
   { id: "ubicaciones", etiqueta: "Ubicaciones y moneda" },
   { id: "usuarios", etiqueta: "Usuarios y roles" },
   { id: "auditoria", etiqueta: "Auditoría" },
+  { id: "mis-datos", etiqueta: "Mis datos" },
 ];
 
 const SECCION_POR_DEFECTO = "perfil";
@@ -92,7 +99,8 @@ export default function Configuracion() {
           Configuración
         </h1>
         <p className="mt-2 text-(--color-texto-apagado)">
-          Datos del comercio, usuarios con permisos y registro de accesos.
+          Datos del comercio, usuarios con permisos, registro de accesos y tus
+          datos personales.
         </p>
       </header>
 
@@ -103,11 +111,20 @@ export default function Configuracion() {
       />
 
       <div className="mt-8">
-        {cargando && (
+        {/*
+          "Mis datos" se renderiza aparte del resto, fuera de la carga del
+          comercio. No necesita ni la configuración ni el perfil, y si esa
+          carga falla igual tiene que poder abrirse: sería absurdo que un error
+          leyendo el negocio le impidiera a alguien ejercer un derecho que la
+          ley le da sobre sus propios datos.
+        */}
+        {activa === "mis-datos" && <SeccionMiCuenta />}
+
+        {activa !== "mis-datos" && cargando && (
           <p className="text-(--color-texto-apagado)">Cargando datos…</p>
         )}
 
-        {!cargando && error && (
+        {activa !== "mis-datos" && !cargando && error && (
           <p
             role="alert"
             className="rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
@@ -117,7 +134,7 @@ export default function Configuracion() {
           </p>
         )}
 
-        {!cargando && !error && configuracion && perfil && (
+        {activa !== "mis-datos" && !cargando && !error && configuracion && perfil && (
           <>
             {activa === "perfil" && (
               // `key` fuerza a montar de nuevo el formulario cuando llegan

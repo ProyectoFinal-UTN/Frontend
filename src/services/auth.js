@@ -46,6 +46,19 @@ async function esperarSesionActualizada() {
 }
 
 /**
+ * Vuelve a leer la sesión desde el backend y actualiza el store.
+ *
+ * Hace falta cuando la sesión deja de ser válida por algo que no pasó por este
+ * cliente. Es el caso de la baja de cuenta (HU-31): el backend borra las
+ * sesiones desde el service, así que la cookie ya no sirve, pero el store de
+ * Better Auth sigue diciendo que hay usuario y `RutaProtegida` dejaría entrar a
+ * una cuenta que ya no existe hasta el próximo refresh.
+ */
+export async function refrescarSesion() {
+  await esperarSesionActualizada();
+}
+
+/**
  * Traduce los errores del backend a algo que se le pueda mostrar a un
  * comerciante. Sin esto la pantalla mostraría "User already exists. Use
  * another email." en inglés y con jerga.

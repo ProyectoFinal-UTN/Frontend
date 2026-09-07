@@ -1,0 +1,31 @@
+# Lo que NUNCA debe entrar a la imagen.
+#
+# El Frontend no maneja secretos, pero un `.env` con una variable `VITE_` mal
+# puesta terminaría igual dentro de la imagen. Mejor cerrarlo por las dudas.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+
+# Se instalan dentro del contenedor. Copiar los de la máquina pisa esa
+# instalación con binarios de otro sistema operativo e infla la imagen.
+node_modules
+
+# El build se genera adentro; copiar uno viejo solo trae confusión.
+dist
+
+# Los tests viven al lado del código que prueban (`src/**/*.test.jsx`), así que
+# no se pueden excluir por carpeta. Igual no llegan a la imagen: el build de
+# Vite solo emite lo que cuelga de `index.html`.
+coverage
+*.log
+.claude
+graphify-out
+
+README.md
+CLAUDE.md
+eslint.config.js
+Dockerfile
+.dockerignore
