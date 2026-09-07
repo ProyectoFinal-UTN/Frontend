@@ -119,6 +119,14 @@ describe("Listado", () => {
 
     expect(screen.getByLabelText(/código de barras/i)).toBeInTheDocument();
   });
+
+  test("cada producto linkea a su detalle de stock (HU-11)", () => {
+    renderizar();
+
+    expect(
+      screen.getByRole("link", { name: "Ver stock de Coca-Cola 500ml" }),
+    ).toHaveAttribute("href", "/productos/p1");
+  });
 });
 
 describe("Alta", () => {

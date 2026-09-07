@@ -51,6 +51,25 @@ describe("EscanearProducto", () => {
     ).toBeInTheDocument();
   });
 
+  test("'Ver detalle' navega a /productos/:id", async () => {
+    mockHook({ estado: "detectado", codigo: "7791234567890" });
+    verificarCodigoBarras.mockResolvedValueOnce({
+      existe: true,
+      producto: {
+        id: "p1",
+        nombre: "Gaseosa 1.5L",
+        codigoBarras: "7791234567890",
+      },
+    });
+
+    render(<EscanearProducto />);
+
+    const boton = await screen.findByRole("button", { name: "Ver detalle" });
+    boton.click();
+
+    expect(mockNavegar).toHaveBeenCalledWith("/productos/p1");
+  });
+
   test("muestra 'no encontrado' con opcion de cargar a mano cuando ni OFF lo tiene", async () => {
     mockHook({ estado: "detectado", codigo: "0000000000000" });
     verificarCodigoBarras.mockResolvedValueOnce({

@@ -33,6 +33,14 @@ export function obtenerProductos() {
 }
 
 /**
+ * Un producto por id, con su stock discriminado por ubicación y el total
+ * (HU-11): `{ ...datosDelProducto, stock: { porUbicacion, total } }`.
+ */
+export function obtenerProducto(id) {
+  return apiFetch(`/productos/${id}`);
+}
+
+/**
  * Da de alta un producto con su stock inicial.
  *
  * `umbralMinimo` y `stockActual` tienen que viajar como números: el backend

@@ -3,6 +3,7 @@ import {
   crearProducto,
   editarProducto,
   eliminarProducto,
+  obtenerProducto,
   obtenerProductos,
   verificarCodigoBarras,
 } from "./productos";
@@ -33,6 +34,39 @@ describe("obtenerProductos", () => {
 
     expect(resultado).toEqual(productos);
     expect(apiFetch).toHaveBeenCalledWith("/productos");
+  });
+});
+
+describe("obtenerProducto", () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+  });
+
+  test("pide GET /productos/:id y devuelve el producto con su stock", async () => {
+    const respuesta = {
+      id: "p1",
+      nombre: "Gaseosa 1.5L",
+      stock: {
+        porUbicacion: [
+          { ubicacionId: "u1", ubicacionNombre: "Local", cantidad: 5 },
+        ],
+        total: 5,
+      },
+    };
+    apiFetch.mockResolvedValueOnce(respuesta);
+
+    const resultado = await obtenerProducto("p1");
+
+    expect(resultado).toEqual(respuesta);
+    expect(apiFetch).toHaveBeenCalledWith("/productos/p1");
+  });
+
+  test("relanza el error si la request falla (ej. 404)", async () => {
+    const error = new Error("El producto no existe");
+    error.status = 404;
+    apiFetch.mockRejectedValueOnce(error);
+
+    await expect(obtenerProducto("no-existe")).rejects.toThrow();
   });
 });
 

@@ -172,8 +172,17 @@ export default function EscanearProducto() {
           )}
           <button
             type="button"
-            onClick={reintentar}
+            onClick={() => navegar(`/productos/${producto.id}`)}
             className={`${BOTON_PRIMARIO} mt-3 w-full`}
+          >
+            Ver detalle
+          </button>
+          <button
+            type="button"
+            onClick={reintentar}
+            className="mt-2 w-full rounded-(--radius) border-2 border-(--color-borde)
+                       bg-(--color-tarjeta) px-4 py-3 font-bold text-(--color-texto)
+                       transition hover:border-(--color-primario)"
           >
             Escanear otro
           </button>

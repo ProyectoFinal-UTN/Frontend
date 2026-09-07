@@ -315,6 +315,13 @@ function FilaProducto({ producto, alEditar, alEliminar, guardando }) {
         </p>
       </div>
       <div className="flex shrink-0 gap-1">
+        <Link
+          to={`/productos/${producto.id}`}
+          aria-label={`Ver stock de ${producto.nombre}`}
+          className={`${CLASES_BOTON_SUAVE} text-(--color-primario)`}
+        >
+          Ver stock
+        </Link>
         <button
           type="button"
           disabled={guardando}
