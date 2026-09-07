@@ -84,6 +84,17 @@ function traducirError(error) {
     return "La contraseña es demasiado larga. El máximo son 72 caracteres.";
   }
 
+  if (
+    error.code === "INVALID_TOKEN" ||
+    error.code === "TOKEN_EXPIRED" ||
+    error.code === "INVALID_OR_EXPIRED_TOKEN"
+  ) {
+    return (
+      "Ese link ya no sirve: vence a la hora y se usa una sola vez. " +
+      "Pedí uno nuevo."
+    );
+  }
+
   if (error.status === 0 || error.status === undefined) {
     return "No pudimos conectarnos con el servidor. Revisá tu conexión.";
   }
@@ -134,6 +145,46 @@ export async function iniciarSesion({ correo, password }) {
   await esperarSesionActualizada();
 
   return { ok: true, usuario: data.user };
+}
+
+/**
+ * Pide el correo con el link para elegir una contraseña nueva (HU-3).
+ *
+ * **Devuelve `ok: true` aunque el correo no exista, y es a propósito.** El
+ * backend responde igual en los dos casos para que no se pueda averiguar quién
+ * tiene cuenta probando de a uno; si acá se mostrara un "ese correo no existe",
+ * el frontend filtraría justo lo que el backend se cuida de no decir.
+ *
+ * Solo se informa un error cuando falla la comunicación, que no dice nada de si
+ * la cuenta existe.
+ */
+export async function pedirRecuperacion({ correo }) {
+  const { error } = await cliente.requestPasswordReset({ email: correo });
+
+  if (error) {
+    return { ok: false, error: traducirError(error) };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Cambia la contraseña con el token que vino en el correo (HU-3).
+ *
+ * El backend cierra además todas las sesiones abiertas de esa cuenta, así que
+ * después de esto hay que volver a entrar.
+ */
+export async function restablecerPassword({ token, password }) {
+  const { error } = await cliente.resetPassword({
+    token,
+    newPassword: password,
+  });
+
+  if (error) {
+    return { ok: false, error: traducirError(error) };
+  }
+
+  return { ok: true };
 }
 
 /** Cierra la sesión activa. */
