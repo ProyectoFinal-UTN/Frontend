@@ -97,13 +97,25 @@ describe("Listado", () => {
     expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument();
   });
 
+  test("ofrece escanear o cargar a mano para arrancar el alta", () => {
+    renderizar();
+
+    expect(screen.getByRole("link", { name: /escanear código/i })).toHaveAttribute(
+      "href",
+      "/productos/escanear",
+    );
+    expect(
+      screen.getByRole("button", { name: /cargar a mano/i }),
+    ).toBeInTheDocument();
+  });
+
   test("el formulario aparece recién al pedirlo", async () => {
     const usuario = userEvent.setup();
     renderizar();
 
     expect(screen.queryByLabelText(/código de barras/i)).not.toBeInTheDocument();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
 
     expect(screen.getByLabelText(/código de barras/i)).toBeInTheDocument();
   });
@@ -124,7 +136,7 @@ describe("Alta", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario);
     await usuario.selectOptions(screen.getByLabelText(/unidad de medida/i), "kg");
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
@@ -140,13 +152,44 @@ describe("Alta", () => {
     expect(alRecargar).toHaveBeenCalled();
   });
 
+  test("avisa que el producto quedó dado de alta", async () => {
+    crearProducto.mockResolvedValue({ id: "p3" });
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
+    await completarFormulario(usuario);
+    await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /«Fideos 500g» se dio de alta correctamente/,
+    );
+  });
+
+  test("el aviso de alta no queda pegado si se abre otra operación", async () => {
+    crearProducto.mockResolvedValue({ id: "p3" });
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
+    await completarFormulario(usuario);
+    await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+    await screen.findByRole("status");
+
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   test("manda los números como números, no como texto", async () => {
     crearProducto.mockResolvedValue({});
 
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario);
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -161,7 +204,7 @@ describe("Alta", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario, { codigoBarras: "abc" });
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -177,7 +220,7 @@ describe("Alta", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario);
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -190,6 +233,26 @@ describe("Alta", () => {
     expect(screen.getByLabelText(/código de barras/i)).toHaveValue(
       "7790895000782",
     );
+  });
+
+  test("precarga nombre y categoria cuando vienen del escáner (sugerencia de Open Food Facts)", () => {
+    renderizar({
+      codigoInicial: "7790580146115",
+      nombreInicial: "puré arcor",
+      categoriaInicial: "Tomate natural triturado",
+    });
+
+    expect(screen.getByLabelText(/nombre/i)).toHaveValue("puré arcor");
+    expect(screen.getByLabelText(/categoría/i)).toHaveValue(
+      "Tomate natural triturado",
+    );
+  });
+
+  test("arranca el alta con nombre/categoria vacíos si el escáner no mandó sugerencia", () => {
+    renderizar({ codigoInicial: "7790580146115" });
+
+    expect(screen.getByLabelText(/nombre/i)).toHaveValue("");
+    expect(screen.getByLabelText(/categoría/i)).toHaveValue("");
   });
 });
 
@@ -208,7 +271,7 @@ describe("Código de barras duplicado (409)", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario, { codigoBarras: "7790895000782" });
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -223,7 +286,7 @@ describe("Código de barras duplicado (409)", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario, { codigoBarras: "7790895000782" });
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -236,7 +299,7 @@ describe("Código de barras duplicado (409)", () => {
     const usuario = userEvent.setup();
     renderizar();
 
-    await usuario.click(screen.getByRole("button", { name: /nuevo producto/i }));
+    await usuario.click(screen.getByRole("button", { name: /cargar a mano/i }));
     await completarFormulario(usuario, { codigoBarras: "7790895000782" });
     await usuario.click(screen.getByRole("button", { name: "Guardar" }));
 

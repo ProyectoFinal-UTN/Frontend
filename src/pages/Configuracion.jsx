@@ -1,25 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
+import SeccionPerfil from "../components/SeccionPerfil";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
 import { obtenerConfiguracion } from "../services/configuracion";
+import { obtenerPerfil } from "../services/comercio";
 
 /**
  * Configuración del comercio.
  *
- * El armazón con las cuatro secciones queda armado acá aunque solo una esté
- * construida: así quien tome HU-4, HU-5 o HU-6 rellena su pestaña en vez de
- * rehacer la pantalla.
+ * El armazón con las cuatro secciones queda armado acá aunque no todas estén
+ * construidas: así quien tome HU-4 o HU-5 rellena su pestaña en vez de rehacer
+ * la pantalla.
  */
 
 const SECCIONES = [
-  { id: "perfil", etiqueta: "Perfil del comercio", hu: "HU-6" },
+  { id: "perfil", etiqueta: "Perfil del comercio", hu: null },
   { id: "ubicaciones", etiqueta: "Ubicaciones y moneda", hu: null },
   { id: "usuarios", etiqueta: "Usuarios y roles", hu: "HU-4" },
   { id: "auditoria", etiqueta: "Auditoría", hu: "HU-5" },
 ];
 
-const SECCION_POR_DEFECTO = "ubicaciones";
+const SECCION_POR_DEFECTO = "perfil";
 
 function Pendiente({ etiqueta, hu }) {
   return (
@@ -35,6 +37,7 @@ function Pendiente({ etiqueta, hu }) {
 export default function Configuracion() {
   const [parametros, setParametros] = useSearchParams();
   const [configuracion, setConfiguracion] = useState(null);
+  const [perfil, setPerfil] = useState(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
 
@@ -59,12 +62,16 @@ export default function Configuracion() {
 
   // Devuelve la promesa en vez de usar async/await para que quede explícito
   // que ningún `setState` ocurre de forma síncrona dentro del efecto.
+  // Las dos cargas van en paralelo: el perfil y la configuración son
+  // endpoints distintos, y esperarlos en serie duplicaría la espera sin
+  // ninguna razón.
   const cargar = useCallback(
     () =>
-      obtenerConfiguracion()
-        .then((datos) => {
+      Promise.all([obtenerConfiguracion(), obtenerPerfil()])
+        .then(([datosConfiguracion, datosPerfil]) => {
           if (!montado.current) return;
-          setConfiguracion(datos);
+          setConfiguracion(datosConfiguracion);
+          setPerfil(datosPerfil);
           setError("");
         })
         .catch((fallo) => {
@@ -120,14 +127,27 @@ export default function Configuracion() {
           </p>
         )}
 
-        {!cargando && !error && configuracion && (
+        {!cargando && !error && configuracion && perfil && (
           <>
-            {activa === "ubicaciones" ? (
+            {activa === "perfil" && (
+              // `key` fuerza a montar de nuevo el formulario cuando llegan
+              // datos distintos: si no, `useState` conserva lo que se tipeó
+              // antes y la pantalla mostraría valores viejos.
+              <SeccionPerfil
+                key={perfil.nombre}
+                perfil={perfil}
+                alGuardar={cargar}
+              />
+            )}
+
+            {activa === "ubicaciones" && (
               <SeccionUbicaciones
                 configuracion={configuracion}
                 alRecargar={cargar}
               />
-            ) : (
+            )}
+
+            {seccion.hu && (
               <Pendiente etiqueta={seccion.etiqueta} hu={seccion.hu} />
             )}
           </>

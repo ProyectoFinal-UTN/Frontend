@@ -17,7 +17,10 @@ export default function Productos() {
 
   // Permite abrir la pantalla con el alta ya desplegada y el código puesto:
   // `/productos?nuevo=7790895000782`. Es el gancho para que el escáner de
-  // HU-10 pueda mandar acá el código que leyó.
+  // HU-10 pueda mandar acá el código que leyó — y, si lo encontró en Open
+  // Food Facts, el nombre/categoría sugeridos (`&nombre=...&categoria=...`),
+  // para no dejar al usuario retipeando lo que la pantalla de escaneo ya le
+  // mostró.
   //
   // Se lee una sola vez, al entrar. Leerlo en cada render lo convertiría en un
   // estado pegajoso: la sección se desmonta ante un error de carga, así que el
@@ -29,15 +32,23 @@ export default function Productos() {
   const [codigoInicial, setCodigoInicial] = useState(
     () => parametros.get("nuevo") ?? "",
   );
+  const [nombreInicial, setNombreInicial] = useState(
+    () => parametros.get("nombre") ?? "",
+  );
+  const [categoriaInicial, setCategoriaInicial] = useState(
+    () => parametros.get("categoria") ?? "",
+  );
 
   useEffect(() => {
     if (!parametros.get("nuevo")) return;
 
-    // Se borra solo `nuevo` y no la query entera, para no pisar parámetros que
+    // Se borran estos tres y no la query entera, para no pisar parámetros que
     // otra historia agregue después. `replace` evita que el botón "atrás"
     // devuelva a la misma URL y reviva el problema por la otra puerta.
     const siguientes = new URLSearchParams(parametros);
     siguientes.delete("nuevo");
+    siguientes.delete("nombre");
+    siguientes.delete("categoria");
     setParametros(siguientes, { replace: true });
   }, [parametros, setParametros]);
 
@@ -131,7 +142,13 @@ export default function Productos() {
           productos={productos}
           alRecargar={cargar}
           codigoInicial={codigoInicial}
-          alConsumirCodigo={() => setCodigoInicial("")}
+          nombreInicial={nombreInicial}
+          categoriaInicial={categoriaInicial}
+          alConsumirCodigo={() => {
+            setCodigoInicial("");
+            setNombreInicial("");
+            setCategoriaInicial("");
+          }}
         />
       )}
     </main>
