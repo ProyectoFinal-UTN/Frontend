@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 describe("Armazón de la pantalla", () => {
-  test("muestra las cuatro secciones del prototipo", async () => {
+  test("muestra las cuatro secciones del prototipo, más Mis datos", async () => {
     renderizar();
 
     const pestanas = await screen.findAllByRole("tab");
@@ -52,6 +52,9 @@ describe("Armazón de la pantalla", () => {
       "Ubicaciones y moneda",
       "Usuarios y roles",
       "Auditoría",
+      // Esta no estaba en el prototipo. Va última porque no es del comercio
+      // sino de la persona (HU-31).
+      "Mis datos",
     ]);
   });
 
@@ -96,6 +99,7 @@ describe("Armazón de la pantalla", () => {
       "Ubicaciones y moneda",
       "Usuarios y roles",
       "Auditoría",
+      "Mis datos",
     ]) {
       await usuario.click(await screen.findByRole("tab", { name: etiqueta }));
       expect(screen.queryByText(/se construye en/i)).not.toBeInTheDocument();
@@ -150,5 +154,19 @@ describe("Carga de datos", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /no hay sesión activa/i,
     );
+  });
+
+  test("Mis datos se abre aunque falle la carga del comercio", async () => {
+    // Sería absurdo que un error leyendo el negocio le impidiera a alguien
+    // ejercer un derecho que la ley le da sobre sus propios datos (HU-31).
+    obtenerConfiguracion.mockRejectedValue(new Error("El comercio no existe"));
+    obtenerPerfil.mockRejectedValue(new Error("El comercio no existe"));
+
+    renderizar("/configuracion?seccion=mis-datos");
+
+    expect(
+      await screen.findByRole("button", { name: /descargar mis datos/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
