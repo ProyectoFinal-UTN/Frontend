@@ -88,11 +88,14 @@ function traducirError(error) {
  *
  * @returns {Promise<{ok: true, usuario: object} | {ok: false, error: string}>}
  */
-export async function registrar({ correo, password }) {
+export async function registrar({ correo, password, invitacionId }) {
   const { data, error } = await cliente.signUp.email({
     email: correo,
     password,
     name: correo.split("@")[0],
+    // Cuando el alta viene de un link de invitación (HU-4), el backend suma a
+    // la persona al comercio que la invitó en vez de crearle uno propio.
+    ...(invitacionId ? { invitacionId } : {}),
   });
 
   if (error) {

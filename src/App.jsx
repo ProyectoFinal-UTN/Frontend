@@ -4,6 +4,7 @@ import Configuracion from "./pages/Configuracion";
 import DetalleProducto from "./pages/DetalleProducto";
 import EscanearProducto from "./pages/EscanearProducto";
 import Inicio from "./pages/Inicio";
+import Invitacion from "./pages/Invitacion";
 import Login from "./pages/Login";
 import Productos from "./pages/Productos";
 import Registro from "./pages/Registro";
@@ -15,6 +16,8 @@ export default function App() {
       <Routes>
         <Route path="/registro" element={<Registro />} />
         <Route path="/login" element={<Login />} />
+        {/* Sin RutaProtegida: quien recibe el link puede no tener cuenta. */}
+        <Route path="/invitacion/:id" element={<Invitacion />} />
         <Route
           path="/"
           element={

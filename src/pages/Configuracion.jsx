@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
 import SeccionPerfil from "../components/SeccionPerfil";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
+import SeccionUsuarios from "../components/SeccionUsuarios";
+import { useAuth } from "../hooks/useAuth";
 import { obtenerConfiguracion } from "../services/configuracion";
 import { obtenerPerfil } from "../services/comercio";
 
@@ -10,14 +12,14 @@ import { obtenerPerfil } from "../services/comercio";
  * Configuración del comercio.
  *
  * El armazón con las cuatro secciones queda armado acá aunque no todas estén
- * construidas: así quien tome HU-4 o HU-5 rellena su pestaña en vez de rehacer
- * la pantalla.
+ * construidas: así quien tome HU-5 rellena su pestaña en vez de rehacer la
+ * pantalla.
  */
 
 const SECCIONES = [
   { id: "perfil", etiqueta: "Perfil del comercio", hu: null },
   { id: "ubicaciones", etiqueta: "Ubicaciones y moneda", hu: null },
-  { id: "usuarios", etiqueta: "Usuarios y roles", hu: "HU-4" },
+  { id: "usuarios", etiqueta: "Usuarios y roles", hu: null },
   { id: "auditoria", etiqueta: "Auditoría", hu: "HU-5" },
 ];
 
@@ -36,6 +38,7 @@ function Pendiente({ etiqueta, hu }) {
 
 export default function Configuracion() {
   const [parametros, setParametros] = useSearchParams();
+  const { usuario } = useAuth();
   const [configuracion, setConfiguracion] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [error, setError] = useState("");
@@ -137,13 +140,30 @@ export default function Configuracion() {
                 key={perfil.nombre}
                 perfil={perfil}
                 alGuardar={cargar}
+                puedeEditar={configuracion.rol === "propietario"}
               />
             )}
 
             {activa === "ubicaciones" && (
+              // Las ubicaciones las administra también el gerente, porque son
+              // parte de operar el negocio. La moneda no: eso es del
+              // propietario. Los permisos reales están en el backend; acá solo
+              // se evita ofrecer lo que va a terminar en un 403.
               <SeccionUbicaciones
                 configuracion={configuracion}
                 alRecargar={cargar}
+                puedeEditarUbicaciones={configuracion.rol !== "empleado"}
+                puedeEditarMoneda={configuracion.rol === "propietario"}
+              />
+            )}
+
+            {activa === "usuarios" && (
+              // El rol viene del backend, no del cliente: es lo que decide qué
+              // controles se muestran. Igual cada endpoint valida por su
+              // cuenta, así que esconderlos es UX y no seguridad.
+              <SeccionUsuarios
+                rol={configuracion.rol}
+                usuarioId={usuario?.id}
               />
             )}
 

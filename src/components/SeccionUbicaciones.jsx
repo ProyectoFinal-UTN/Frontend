@@ -32,7 +32,13 @@ const CLASES_BOTON_SUAVE =
  * operación en curso. Sin eso, un doble clic en «Sí, eliminar» manda dos DELETE
  * y el segundo vuelve con un 404 confuso sobre una fila que ya no existe.
  */
-function FilaUbicacion({ ubicacion, alRenombrar, alEliminar, guardando }) {
+function FilaUbicacion({
+  ubicacion,
+  alRenombrar,
+  alEliminar,
+  guardando,
+  puedeEditar = true,
+}) {
   const [modo, setModo] = useState("ver");
   const [nombre, setNombre] = useState(ubicacion.nombre);
 
@@ -117,31 +123,40 @@ function FilaUbicacion({ ubicacion, alRenombrar, alEliminar, guardando }) {
                  border-2 border-(--color-borde) px-4 py-3"
     >
       <span className="font-bold text-(--color-texto)">{ubicacion.nombre}</span>
-      <div className="flex shrink-0 gap-1">
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={() => setModo("editar")}
-          aria-label={`Renombrar ${ubicacion.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
-        >
-          Renombrar
-        </button>
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={() => setModo("confirmar")}
-          aria-label={`Eliminar ${ubicacion.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
-        >
-          Eliminar
-        </button>
-      </div>
+      {puedeEditar && (
+        <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            disabled={guardando}
+            onClick={() => setModo("editar")}
+            aria-label={`Renombrar ${ubicacion.nombre}`}
+            className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
+          >
+            Renombrar
+          </button>
+          <button
+            type="button"
+            disabled={guardando}
+            onClick={() => setModo("confirmar")}
+            aria-label={`Eliminar ${ubicacion.nombre}`}
+            className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
+          >
+            Eliminar
+          </button>
+        </div>
+      )}
     </li>
   );
 }
 
-export default function SeccionUbicaciones({ configuracion, alRecargar }) {
+export default function SeccionUbicaciones({
+  configuracion,
+  alRecargar,
+  // Un empleado ve la lista —la necesita para elegir dónde registrar un
+  // movimiento— pero no la edita. La moneda es solo del propietario.
+  puedeEditarUbicaciones = true,
+  puedeEditarMoneda = true,
+}) {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -218,6 +233,7 @@ export default function SeccionUbicaciones({ configuracion, alRecargar }) {
                 key={ubicacion.id}
                 ubicacion={ubicacion}
                 guardando={guardando}
+                puedeEditar={puedeEditarUbicaciones}
                 alRenombrar={(id, nombre) =>
                   ejecutar(() => renombrarUbicacion(id, nombre.trim()))
                 }
@@ -227,7 +243,17 @@ export default function SeccionUbicaciones({ configuracion, alRecargar }) {
           </ul>
         )}
 
-        <form onSubmit={agregar} className="mt-4 flex flex-col gap-2 sm:flex-row">
+        {!puedeEditarUbicaciones && (
+          <p className="mt-4 text-sm text-(--color-texto-apagado)">
+            Tu rol puede consultarlas, pero no modificarlas.
+          </p>
+        )}
+
+        <form
+          onSubmit={agregar}
+          hidden={!puedeEditarUbicaciones}
+          className="mt-4 flex flex-col gap-2 sm:flex-row"
+        >
           <label htmlFor="nueva-ubicacion" className="sr-only">
             Nombre de la ubicación
           </label>
@@ -254,7 +280,9 @@ export default function SeccionUbicaciones({ configuracion, alRecargar }) {
       <section>
         <h2 className="text-xl font-extrabold text-(--color-texto)">Moneda</h2>
         <p className="mt-1 text-sm text-(--color-texto-apagado)">
-          Con la que se muestran los precios y los totales del negocio.
+          {puedeEditarMoneda
+            ? "Con la que se muestran los precios y los totales del negocio."
+            : "Solo el propietario puede cambiarla."}
         </p>
 
         <label htmlFor="moneda" className="sr-only">
@@ -263,7 +291,7 @@ export default function SeccionUbicaciones({ configuracion, alRecargar }) {
         <select
           id="moneda"
           value={moneda}
-          disabled={guardando}
+          disabled={guardando || !puedeEditarMoneda}
           onChange={(evento) =>
             ejecutar(() => cambiarMoneda(evento.target.value))
           }

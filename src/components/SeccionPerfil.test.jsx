@@ -76,6 +76,44 @@ describe("validarPerfil", () => {
   });
 });
 
+describe("Cuando el rol no puede editar", () => {
+  test("no ofrece guardar y los campos quedan de solo lectura", () => {
+    // El backend igual lo rechaza; esto evita que se entere después de
+    // llenar el formulario y apretar el botón.
+    render(
+      <SeccionPerfil
+        perfil={PERFIL_VACIO}
+        alGuardar={alGuardar}
+        puedeEditar={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /guardar cambios/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/nombre del negocio/i)).toHaveAttribute(
+      "readonly",
+    );
+    expect(
+      screen.getByText(/solo el propietario puede modificarlos/i),
+    ).toBeInTheDocument();
+  });
+
+  test("igual muestra los datos, que se pueden consultar", () => {
+    render(
+      <SeccionPerfil
+        perfil={{ ...PERFIL_VACIO, nombre: "Kiosco Don Pepe" }}
+        alGuardar={alGuardar}
+        puedeEditar={false}
+      />,
+    );
+
+    expect(screen.getByLabelText(/nombre del negocio/i)).toHaveValue(
+      "Kiosco Don Pepe",
+    );
+  });
+});
+
 describe("Formulario de perfil", () => {
   test("muestra los datos que ya tiene el comercio", () => {
     renderizar({
