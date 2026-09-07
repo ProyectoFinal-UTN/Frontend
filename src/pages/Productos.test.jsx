@@ -20,9 +20,18 @@ vi.mock("../services/productos", async (original) => ({
   eliminarProducto: vi.fn(),
 }));
 
+// La pantalla la consulta solo para saber si mostrar la entrada a la
+// importación de HU-7. Se mockea para que el test no salga a la red por un
+// dato que es cosmético.
+vi.mock("../services/configuracion", async (original) => ({
+  ...(await original()),
+  obtenerConfiguracion: vi.fn(),
+}));
+
 const { obtenerProductos, eliminarProducto } = await import(
   "../services/productos"
 );
+const { obtenerConfiguracion } = await import("../services/configuracion");
 
 const PRODUCTOS = [
   {
@@ -47,6 +56,7 @@ function renderizar(rutaInicial = "/productos") {
 beforeEach(() => {
   vi.clearAllMocks();
   obtenerProductos.mockResolvedValue(PRODUCTOS);
+  obtenerConfiguracion.mockResolvedValue({ rol: "propietario" });
 });
 
 describe("Carga de la pantalla", () => {
@@ -70,6 +80,35 @@ describe("Carga de la pantalla", () => {
 
     expect(await screen.findByText(/todavía no cargaste/i)).toBeInTheDocument();
     expect(screen.queryByText(/cargando productos/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Entrada a la importación (HU-7)", () => {
+  test("se ofrece a quien puede crear productos", async () => {
+    renderizar();
+
+    expect(
+      await screen.findByRole("link", { name: "Importar desde CSV" }),
+    ).toHaveAttribute("href", "/productos/importar");
+  });
+
+  test("no se le ofrece al empleado, que terminaría en un 403", async () => {
+    obtenerConfiguracion.mockResolvedValue({ rol: "empleado" });
+    renderizar();
+
+    await screen.findByText("Coca-Cola 500ml");
+    expect(
+      screen.queryByRole("link", { name: "Importar desde CSV" }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("si no se puede saber el rol, el catálogo se muestra igual", async () => {
+    // El link se ofrece de más y el backend corta si no corresponde. Romper el
+    // catálogo por una request secundaria sería mucho peor.
+    obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
+    renderizar();
+
+    expect(await screen.findByText("Coca-Cola 500ml")).toBeInTheDocument();
   });
 });
 

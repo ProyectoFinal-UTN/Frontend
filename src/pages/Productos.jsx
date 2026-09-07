@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import SeccionProductos from "../components/SeccionProductos";
+import { obtenerConfiguracion } from "../services/configuracion";
 import { obtenerProductos } from "../services/productos";
 
 /**
@@ -87,6 +88,24 @@ export default function Productos() {
     cargar();
   }, [cargar]);
 
+  // Solo para saber si mostrar la entrada a la importación (HU-7): un empleado
+  // no puede crear productos, y mandarlo a una pantalla que termina en un 403
+  // después de que eligió el archivo es peor que no ofrecérsela.
+  //
+  // Va en su propio efecto y no encadenada a `cargar`, para que el catálogo no
+  // dependa de esta llamada. Si falla, el link se muestra igual: equivocarse
+  // hacia "mostrar de más" deja al backend rechazando, que es lo correcto;
+  // equivocarse hacia "esconder" le saca una función a quien sí podía usarla.
+  const [rol, setRol] = useState(null);
+
+  useEffect(() => {
+    obtenerConfiguracion()
+      .then((configuracion) => {
+        if (montado.current) setRol(configuracion.rol);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
       <header className="mb-6">
@@ -103,6 +122,18 @@ export default function Productos() {
           Cargá lo que vendés, corregí lo que cambió y dá de baja lo que ya no
           trabajás.
         </p>
+
+        {rol !== "empleado" && (
+          <Link
+            to="/productos/importar"
+            className="mt-4 inline-block rounded-(--radius) border-2
+                       border-(--color-borde) bg-(--color-tarjeta) px-4 py-2
+                       text-sm font-bold text-(--color-texto) transition
+                       hover:border-(--color-primario)"
+          >
+            Importar desde CSV
+          </Link>
+        )}
       </header>
 
       {cargando && (

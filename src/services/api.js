@@ -11,6 +11,16 @@ const BASE_URL = "/api";
  * hardcodear el host.
  */
 export async function apiFetch(endpoint, options = {}) {
+  // Un `FormData` (la importación de catálogo de HU-7) tiene que viajar como
+  // `multipart/form-data; boundary=...`, y ese boundary lo genera el navegador:
+  // es la marca aleatoria que separa las partes del cuerpo. Si le imponemos un
+  // Content-Type —el `application/json` de acá abajo, o incluso un
+  // "multipart/form-data" escrito a mano— el header sale sin boundary, el
+  // servidor no encuentra dónde empieza el archivo y la request llega como si
+  // no se hubiera mandado nada. La única forma de que lo ponga bien es no
+  // mandarlo: `fetch` lo completa solo cuando el body es FormData.
+  const esFormData = options.body instanceof FormData;
+
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
     // Sin esto la cookie de sesión no viaja cuando el front y el back están en
@@ -19,7 +29,10 @@ export async function apiFetch(endpoint, options = {}) {
     credentials: "include",
     // Va después del spread a propósito: si fuera antes, un `options.headers`
     // reemplazaría el objeto entero y se perdería el Content-Type.
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: {
+      ...(esFormData ? {} : { "Content-Type": "application/json" }),
+      ...options.headers,
+    },
   });
 
   // 204 y 205 no traen cuerpo; intentar parsearlos tira SyntaxError.

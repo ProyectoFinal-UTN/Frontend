@@ -3,6 +3,7 @@ import {
   crearProducto,
   editarProducto,
   eliminarProducto,
+  importarCatalogo,
   obtenerProducto,
   obtenerProductos,
   verificarCodigoBarras,
@@ -191,5 +192,68 @@ describe("verificarCodigoBarras", () => {
     apiFetch.mockRejectedValueOnce(error);
 
     await expect(verificarCodigoBarras("abc")).rejects.toThrow();
+  });
+});
+
+describe("importarCatalogo (HU-7)", () => {
+  const ARCHIVO = new File(["nombre,codigo_barras"], "catalogo.csv", {
+    type: "text/csv",
+  });
+
+  beforeEach(() => {
+    apiFetch.mockReset();
+  });
+
+  test("manda el archivo como FormData en el campo 'archivo'", async () => {
+    // El nombre del campo no es negociable: multer escucha `archivo` y con
+    // cualquier otro responde 400 "El archivo debe enviarse en el campo
+    // archivo".
+    apiFetch.mockResolvedValueOnce({});
+
+    await importarCatalogo(ARCHIVO);
+
+    const [ruta, opciones] = apiFetch.mock.calls[0];
+
+    expect(ruta).toBe("/productos/importar");
+    expect(opciones.method).toBe("POST");
+    expect(opciones.body).toBeInstanceOf(FormData);
+    expect(opciones.body.get("archivo")).toBe(ARCHIVO);
+  });
+
+  test("no le pone Content-Type: lo tiene que armar el navegador", async () => {
+    apiFetch.mockResolvedValueOnce({});
+
+    await importarCatalogo(ARCHIVO);
+
+    expect(apiFetch.mock.calls[0][1].headers).toBeUndefined();
+  });
+
+  test("devuelve el reporte tal cual, aunque haya filas rechazadas", async () => {
+    // Un 200 con `fallidos > 0` es el resultado normal de la historia. Si el
+    // service lo interpretara como un fallo, el resumen de errores —que es el
+    // criterio de aceptación central— no se mostraría nunca.
+    const reporte = {
+      totalFilas: 5,
+      procesadas: 5,
+      importados: 3,
+      fallidos: 2,
+      productos: [],
+      errores: [{ fila: 7, codigoBarras: "444444", motivo: "Unidad inválida" }],
+      interrumpido: false,
+      interrupcion: null,
+    };
+    apiFetch.mockResolvedValueOnce(reporte);
+
+    await expect(importarCatalogo(ARCHIVO)).resolves.toEqual(reporte);
+  });
+
+  test("relanza el 400 que invalida el archivo entero", async () => {
+    const error = new Error("El archivo CSV está vacío");
+    error.status = 400;
+    apiFetch.mockRejectedValueOnce(error);
+
+    await expect(importarCatalogo(ARCHIVO)).rejects.toThrow(
+      "El archivo CSV está vacío",
+    );
   });
 });

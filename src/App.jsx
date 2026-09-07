@@ -3,6 +3,7 @@ import RutaProtegida from "./components/RutaProtegida";
 import Configuracion from "./pages/Configuracion";
 import DetalleProducto from "./pages/DetalleProducto";
 import EscanearProducto from "./pages/EscanearProducto";
+import ImportarProductos from "./pages/ImportarProductos";
 import Inicio from "./pages/Inicio";
 import Invitacion from "./pages/Invitacion";
 import Login from "./pages/Login";
@@ -55,6 +56,19 @@ export default function App() {
           element={
             <RutaProtegida>
               <EscanearProducto />
+            </RutaProtegida>
+          }
+        />
+        {/*
+          Va antes que `/productos/:id` en el archivo por prolijidad, pero no
+          depende de eso: React Router rankea por especificidad, así que un
+          segmento fijo como "importar" siempre le gana al `:id`.
+        */}
+        <Route
+          path="/productos/importar"
+          element={
+            <RutaProtegida>
+              <ImportarProductos />
             </RutaProtegida>
           }
         />
