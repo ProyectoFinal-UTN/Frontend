@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   MAXIMO_ENTERO,
+  validarCantidad,
   validarMovimiento,
 } from "./RegistrarMovimiento.validacion";
 
@@ -124,5 +125,44 @@ describe("Ubicacion", () => {
     );
 
     expect(errores).toEqual({});
+  });
+});
+
+describe("validarCantidad, usada tambien por DetalleProducto", () => {
+  // `DetalleProducto.jsx` (HU-11) importa esta función para su ajuste por
+  // fila. Los casos de arriba la ejercitan a través de `validarMovimiento`;
+  // estos la prueban directo y con el mensaje textual, porque es lo que
+  // afirman los E2E de Infraestructura y porque en la pantalla de HU-11 el
+  // navegador frena el cero, los decimales y los signos antes del `onSubmit`
+  // (el campo declara `min="1"` y hereda `step="1"`), así que ningún E2E
+  // llega hasta acá.
+
+  test("acepta una cantidad valida", () => {
+    expect(validarCantidad("3")).toBeNull();
+  });
+
+  test("pide la cantidad cuando viene vacia, nula o solo espacios", () => {
+    for (const valor of ["", "   ", null, undefined]) {
+      expect(validarCantidad(valor)).toBe("Ingresá cuántas unidades.");
+    }
+  });
+
+  test("rechaza el cero: un movimiento de 0 unidades no mueve nada", () => {
+    expect(validarCantidad("0")).toBe("Tiene que ser al menos 1.");
+  });
+
+  test("rechaza decimales, signos, notacion cientifica y hexadecimal", () => {
+    for (const valor of ["1.5", "1,5", "-3", "+3", "1e3", "0x10", "tres"]) {
+      expect(validarCantidad(valor)).toBe(
+        "Tiene que ser un número entero, sin decimales ni signos.",
+      );
+    }
+  });
+
+  test("rechaza pasarse del maximo de la columna y acepta el maximo exacto", () => {
+    expect(validarCantidad(String(MAXIMO_ENTERO + 1))).toBe(
+      `No puede superar ${MAXIMO_ENTERO}.`,
+    );
+    expect(validarCantidad(String(MAXIMO_ENTERO))).toBeNull();
   });
 });
