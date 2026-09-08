@@ -86,14 +86,23 @@ export default function SeccionPerfil({
     setGuardando(true);
     setErrorGeneral("");
 
+    const guardados = {
+      nombre: campos.nombre.trim(),
+      rubro: campos.rubro.trim(),
+      direccion: campos.direccion.trim(),
+      telefono: campos.telefono.trim(),
+      correoContacto: campos.correoContacto.trim(),
+    };
+
     try {
-      await guardarPerfil({
-        nombre: campos.nombre.trim(),
-        rubro: campos.rubro.trim(),
-        direccion: campos.direccion.trim(),
-        telefono: campos.telefono.trim(),
-        correoContacto: campos.correoContacto.trim(),
-      });
+      await guardarPerfil(guardados);
+
+      // Se reflejan los valores tal como se guardaron, que no son exactamente
+      // los tipeados: los espacios de los extremos se recortan. Antes de esto,
+      // eso lo resolvía un `key` en el padre que remontaba el formulario, pero
+      // el remonte se llevaba puesto el aviso de "Datos guardados" — ver el
+      // comentario en Configuracion.jsx.
+      setCampos(aFormulario(guardados));
 
       await alGuardar();
       setGuardado(true);

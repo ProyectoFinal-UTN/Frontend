@@ -137,11 +137,15 @@ export default function Configuracion() {
         {activa !== "mis-datos" && !cargando && !error && configuracion && perfil && (
           <>
             {activa === "perfil" && (
-              // `key` fuerza a montar de nuevo el formulario cuando llegan
-              // datos distintos: si no, `useState` conserva lo que se tipeó
-              // antes y la pantalla mostraría valores viejos.
+              // Sin `key`, a propósito. Antes había uno atado a `perfil.nombre`
+              // para forzar el remonte cuando llegaban datos distintos, pero el
+              // único momento en que eso pasa es después de guardar, y ahí el
+              // remonte ocurría en medio del `await` y se llevaba puesto el
+              // aviso de "Datos guardados": cambiar el nombre del negocio
+              // guardaba bien y no mostraba ninguna confirmación. Ahora el
+              // propio formulario refleja lo que guardó (ver SeccionPerfil), que
+              // era lo que el `key` venía a resolver.
               <SeccionPerfil
-                key={perfil.nombre}
                 perfil={perfil}
                 alGuardar={cargar}
                 puedeEditar={configuracion.rol === "propietario"}
