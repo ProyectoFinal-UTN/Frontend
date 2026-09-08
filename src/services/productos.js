@@ -82,6 +82,42 @@ export function eliminarProducto(id) {
 }
 
 /**
+ * Importa un catálogo inicial desde un CSV (HU-7).
+ *
+ * Devuelve el reporte del backend **tal cual, sin interpretarlo**:
+ *
+ * ```
+ * { totalFilas, procesadas, importados, fallidos,
+ *   productos: [{ fila, id, nombre, codigoBarras }],
+ *   errores:   [{ fila, codigoBarras, motivo }],
+ *   interrumpido, interrupcion: { fila, motivo } | null }
+ * ```
+ *
+ * Tres cosas que parecen de más y no lo son:
+ *
+ * 1. El campo del FormData se llama **exactamente** `archivo`. Con cualquier
+ *    otro nombre multer responde 400 "El archivo debe enviarse en el campo
+ *    archivo".
+ * 2. No se le pone `Content-Type` a la request. Lo explica `api.js`: con
+ *    FormData el header lo tiene que armar el navegador, porque es el único
+ *    que puede calcular el boundary.
+ * 3. Acá no se decide si "salió bien". El endpoint responde **200 aunque haya
+ *    filas rechazadas** —un resultado parcial es el resultado esperado de la
+ *    historia, no un error— así que un `if (reporte.fallidos) throw` de este
+ *    lado haría que el resumen de errores, que es el corazón de HU-7, no se
+ *    mostrara nunca. Los 4xx (columna obligatoria faltante, archivo vacío,
+ *    ilegible, más de 2 MB o de 1000 filas) traen `{ error }` en vez del
+ *    reporte, y de esos ya se encarga `api.js` tirando la excepción: el
+ *    llamador los recibe por el `catch`, nunca mezclados con el reporte.
+ */
+export function importarCatalogo(archivo) {
+  const cuerpo = new FormData();
+  cuerpo.append("archivo", archivo);
+
+  return apiFetch("/productos/importar", { method: "POST", body: cuerpo });
+}
+
+/**
  * Consulta un código de barras contra el catálogo del comercio (HU-9/HU-10:
  * `GET /api/productos/codigo/:codigoBarras`, en Backend desde HU-9).
  *
