@@ -59,7 +59,7 @@ export function validarMovimiento(campos, { pideUbicacion = false } = {}) {
 }
 
 /**
- * Reglas de la cantidad.
+ * Reglas de la cantidad de un movimiento.
  *
  * Se chequea el texto con un regex en vez de `Number(valor)` porque `Number`
  * acepta "1e3", " 5 " y "0x10", que después el backend rechaza. Mismo criterio
@@ -67,11 +67,23 @@ export function validarMovimiento(campos, { pideUbicacion = false } = {}) {
  *
  * A diferencia de aquel, acá el cero no sirve: la cantidad se manda siempre
  * como magnitud positiva y un movimiento de 0 unidades no mueve nada, así que
- * el backend lo rechaza con un 400.
+ * el backend lo rechaza con un 400. Por eso son dos funciones y no una: un
+ * producto sí puede darse de alta con stock 0.
+ *
+ * Se exporta porque `DetalleProducto.jsx` (HU-11) ofrece el mismo movimiento
+ * de ajuste por fila de ubicación, con el producto y la ubicación ya elegidos
+ * por contexto. Antes tenía una copia literal de estas reglas; el problema no
+ * era el duplicado en sí sino que esa copia quedaba sin cobertura: el campo
+ * declara `min="1"` y hereda `step="1"`, así que el navegador frena el cero,
+ * los decimales y los signos antes del `onSubmit` y ningún E2E puede llegar a
+ * esas ramas. Los tests de este módulo son los que las ejercitan.
+ *
+ * Los mensajes son contrato de los E2E de Infraestructura: si cambian acá,
+ * hay que actualizar `tests/e2e/detalle-producto.spec.js` allá.
  *
  * @returns el mensaje de error, o `null` si el valor sirve.
  */
-function validarCantidad(valor) {
+export function validarCantidad(valor) {
   const texto = String(valor ?? "").trim();
 
   if (!texto) {

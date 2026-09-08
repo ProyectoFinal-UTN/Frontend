@@ -8,6 +8,7 @@ import {
   TIPO_CON_SENTIDO,
   registrarMovimiento,
 } from "../services/movimientos";
+import { validarCantidad } from "./RegistrarMovimiento.validacion";
 
 /**
  * Stock de un producto, discriminado por ubicación (HU-11).
@@ -22,22 +23,6 @@ import {
  * `RegistrarMovimiento` sigue siendo el camino para compra/venta/merma o para
  * un ajuste sin partir de la ficha de un producto puntual.
  */
-
-const MAXIMO_ENTERO = 2147483647;
-
-/** Mismo criterio que `validarCantidad` en `RegistrarMovimiento.validacion.js`. */
-function validarCantidad(valor) {
-  const texto = String(valor ?? "").trim();
-
-  if (!texto) return "Ingresá cuántas unidades.";
-  if (!/^\d+$/.test(texto)) {
-    return "Tiene que ser un número entero, sin decimales ni signos.";
-  }
-  if (Number(texto) === 0) return "Tiene que ser al menos 1.";
-  if (Number(texto) > MAXIMO_ENTERO) return `No puede superar ${MAXIMO_ENTERO}.`;
-
-  return null;
-}
 
 /**
  * Una fila de ubicación, con su propio ajuste inline.
@@ -96,7 +81,11 @@ function FilaStock({ fila, productoId, alAjustar }) {
         <span className="text-(--color-texto)">{fila.cantidad}</span>
       </div>
 
-      <form onSubmit={ajustar} className="mt-2 flex flex-col gap-2 sm:flex-row">
+      <form
+        onSubmit={ajustar}
+        aria-label={`Ajustar stock en ${fila.ubicacionNombre}`}
+        className="mt-2 flex flex-col gap-2 sm:flex-row"
+      >
         <div className="flex-1">
           <Campo
             id={`cantidad-${fila.ubicacionId}`}

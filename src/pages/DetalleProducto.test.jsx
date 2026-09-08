@@ -148,6 +148,42 @@ describe("DetalleProducto", () => {
     });
   });
 
+  test("da a cada fila un formulario con nombre propio", async () => {
+    // Hay un formulario por ubicación: sin un nombre que los distinga, un
+    // lector de pantalla anuncia dos veces lo mismo. Es lo que ya hacen
+    // SeccionProductos ("Nuevo producto") y RegistrarMovimiento
+    // ("Registrar movimiento").
+    obtenerProducto.mockResolvedValueOnce(
+      productoConStock({
+        stock: {
+          porUbicacion: [
+            { ubicacionId: "u1", ubicacionNombre: "Local", cantidad: 7 },
+            { ubicacionId: "u2", ubicacionNombre: "Depósito", cantidad: 5 },
+          ],
+          total: 12,
+        },
+      }),
+    );
+
+    renderizar();
+    await screen.findByText("Local");
+
+    expect(
+      screen.getByRole("form", { name: "Ajustar stock en Local" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("form", { name: "Ajustar stock en Depósito" }),
+    ).toBeInTheDocument();
+  });
+
+  // Este es el único caso inválido que la pantalla puede probar: el campo
+  // declara `min="1"` y hereda `step="1"`, así que para el cero, los decimales
+  // y los signos la validación nativa del navegador frena el submit antes de
+  // que corra `ajustar`. jsdom se comporta igual que Chromium (con "0" el
+  // input queda en `rangeUnderflow` y el `onSubmit` no se dispara), así que
+  // esas ramas no son alcanzables ni desde acá ni desde un E2E: se cubren
+  // sobre la `validarCantidad` que esta pantalla importa, en
+  // RegistrarMovimiento.validacion.test.js.
   test("rechaza un ajuste sin cantidad ni sentido, sin llamar al service", async () => {
     const usuario = userEvent.setup();
     obtenerProducto.mockResolvedValueOnce(
