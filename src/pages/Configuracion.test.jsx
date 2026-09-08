@@ -15,7 +15,7 @@ vi.mock("../services/comercio", () => ({
 }));
 
 const { obtenerConfiguracion } = await import("../services/configuracion");
-const { obtenerPerfil } = await import("../services/comercio");
+const { obtenerPerfil, guardarPerfil } = await import("../services/comercio");
 
 function renderizar(rutaInicial = "/configuracion") {
   return render(
@@ -168,5 +168,56 @@ describe("Carga de datos", () => {
       await screen.findByRole("button", { name: /descargar mis datos/i }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+describe("Aviso de guardado del perfil (regresión)", () => {
+  test("cambiar el nombre del negocio muestra la confirmación", async () => {
+    // Lo detectó el E2E de HU-6 y no se podía ver en SeccionPerfil.test.jsx:
+    // ahí el componente se renderiza suelto, sin el padre. El bug estaba
+    // justamente en el padre — un `key={perfil.nombre}` remontaba el formulario
+    // en medio del `await` de la recarga, y el `setGuardado(true)` posterior
+    // caía sobre un componente que React ya había reemplazado. El dato se
+    // guardaba, pero no aparecía ninguna confirmación.
+    //
+    // Por eso el test vive acá: hace falta la pantalla entera, y hace falta que
+    // la recarga devuelva un nombre distinto, que es lo que cambiaba el `key`.
+    guardarPerfil.mockResolvedValue({});
+    // Sin el rol, `puedeEditar` queda en false y los campos salen `readOnly`:
+    // el formulario no se puede ni completar.
+    obtenerConfiguracion.mockResolvedValue({
+      nombre: "Mi comercio",
+      moneda: "ARS",
+      rol: "propietario",
+      ubicaciones: [{ id: "u1", nombre: "Depósito" }],
+    });
+    obtenerPerfil
+      .mockResolvedValueOnce({
+        nombre: "Mi comercio",
+        rubro: null,
+        direccion: null,
+        telefono: null,
+        correoContacto: null,
+      })
+      .mockResolvedValue({
+        nombre: "Kiosco Don Pepe",
+        rubro: "Kiosco",
+        direccion: null,
+        telefono: null,
+        correoContacto: null,
+      });
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    const nombre = await screen.findByLabelText(/nombre del negocio/i);
+    await usuario.clear(nombre);
+    await usuario.type(nombre, "Kiosco Don Pepe");
+    await usuario.type(screen.getByLabelText(/^rubro$/i), "Kiosco");
+    await usuario.click(screen.getByRole("button", { name: /guardar cambios/i }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /datos guardados/i,
+    );
   });
 });
