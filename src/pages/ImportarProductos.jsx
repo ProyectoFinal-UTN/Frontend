@@ -4,7 +4,12 @@ import ResumenImportacion from "../components/ResumenImportacion";
 import VistaPreviaCsv from "../components/VistaPreviaCsv";
 import { obtenerConfiguracion } from "../services/configuracion";
 import { importarCatalogo } from "../services/productos";
-import { leerCsv, validarArchivo } from "./ImportarProductos.validacion";
+import {
+  MAXIMO_FILAS,
+  contarProductos,
+  leerCsv,
+  validarArchivo,
+} from "./ImportarProductos.validacion";
 
 /**
  * Importación del catálogo inicial desde un CSV (HU-7).
@@ -68,6 +73,15 @@ export default function ImportarProductos() {
 
   function alElegirArchivo(evento) {
     const elegido = evento.target.files?.[0] ?? null;
+
+    // Se limpia el input apenas se saca el archivo de adentro, y no al final:
+    // un `<input type="file">` no vuelve a disparar `change` si se elige el
+    // mismo archivo dos veces seguidas. Sin esto, el "corregí la columna y
+    // volvé a elegir el archivo" de más abajo no funciona nunca — la persona
+    // arregla la planilla en Excel, la guarda con el mismo nombre, la vuelve a
+    // elegir y la pantalla no se entera. El `File` ya capturado sigue siendo
+    // válido: limpiar el input no lo invalida.
+    evento.target.value = "";
 
     setReporte(null);
     setPrevia(null);
@@ -146,6 +160,7 @@ export default function ImportarProductos() {
   }
 
   const faltanColumnas = previa ? previa.faltantes.length > 0 : false;
+  const excedeMaximo = previa ? previa.excedeMaximo : false;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
@@ -226,16 +241,27 @@ export default function ImportarProductos() {
                   className="rounded-(--radius) bg-(--color-atencion-suave) px-4 py-3
                              text-sm font-semibold text-(--color-atencion)"
                 >
-                  Al archivo le{" "}
-                  {previa.faltantes.length === 1 ? "falta" : "faltan"} una
-                  columna obligatoria: {previa.faltantes.join(", ")}. Agregala y
-                  volvé a elegir el archivo.
+                  {previa.faltantes.length === 1
+                    ? `Al archivo le falta una columna obligatoria: ${previa.faltantes[0]}. Agregala`
+                    : `Al archivo le faltan columnas obligatorias: ${previa.faltantes.join(", ")}. Agregalas`}{" "}
+                  y volvé a elegir el archivo.
+                </div>
+              )}
+
+              {excedeMaximo && (
+                <div
+                  role="alert"
+                  className="rounded-(--radius) bg-(--color-atencion-suave) px-4 py-3
+                             text-sm font-semibold text-(--color-atencion)"
+                >
+                  El archivo tiene {previa.totalFilas} filas y el máximo es{" "}
+                  {MAXIMO_FILAS}. Dividilo en partes y subilas de a una.
                 </div>
               )}
 
               <VistaPreviaCsv previa={previa} />
 
-              {previa && !faltanColumnas && (
+              {previa && !faltanColumnas && !excedeMaximo && (
                 <div className="flex flex-col gap-2">
                   <button
                     type="button"
@@ -245,7 +271,7 @@ export default function ImportarProductos() {
                   >
                     {subiendo
                       ? "Importando…"
-                      : `Confirmar carga de ${previa.totalFilas} productos`}
+                      : `Confirmar carga de ${contarProductos(previa.totalFilas)}`}
                   </button>
                   {subiendo && (
                     // Un catálogo de 1000 filas son 1000 transacciones: sin

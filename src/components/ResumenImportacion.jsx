@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   armarCsvDeErrores,
+  contarProductos,
   descargarCsv,
 } from "../pages/ImportarProductos.validacion";
 
@@ -141,7 +142,9 @@ function ListaDeImportados({ productos }) {
   return (
     <details className="mt-4">
       <summary className="cursor-pointer text-sm font-bold text-(--color-texto)">
-        Ver los {productos.length} productos importados
+        {productos.length === 1
+          ? "Ver el producto importado"
+          : `Ver los ${productos.length} productos importados`}
       </summary>
       <ul className="mt-2 flex flex-col gap-1">
         {productos.slice(0, TOPE_VISIBLE).map((producto) => (
@@ -214,8 +217,8 @@ export default function ResumenImportacion({
               }`}
             >
               {estado === "completo"
-                ? `Se importaron los ${importados} productos del archivo.`
-                : `Se importaron ${importados} de ${totalFilas} productos.`}
+                ? `Se ${importados === 1 ? "importó" : "importaron"} ${contarProductos(importados)}: el archivo entró completo.`
+                : `Se ${importados === 1 ? "importó" : "importaron"} ${importados} de ${totalFilas} productos.`}
             </h2>
 
             {estado === "conErrores" && (
@@ -241,7 +244,7 @@ export default function ResumenImportacion({
                 {cuentaCierra && (
                   <p>
                     {fallidos > 0
-                      ? `Se alcanzaron a procesar ${procesadas} filas y ${fallidos} quedaron con error.`
+                      ? `Se alcanzaron a procesar ${procesadas} filas y ${fallidos === 1 ? "1 quedó" : `${fallidos} quedaron`} con error.`
                       : `Se alcanzaron a procesar ${procesadas} filas.`}{" "}
                     {sinProcesar > 0 &&
                       (sinProcesar === 1

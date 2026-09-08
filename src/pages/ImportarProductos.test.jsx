@@ -114,12 +114,85 @@ describe("vista previa antes de confirmar", () => {
     await elegir(usuario, archivoCsv("nombre,codigo_barras\nYerba,7790895000782"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      /categoria, unidad_medida/,
+      "Al archivo le faltan columnas obligatorias: categoria, unidad_medida. Agregalas y volvé a elegir el archivo.",
     );
     expect(
       screen.queryByRole("button", { name: /Confirmar carga/ }),
     ).not.toBeInTheDocument();
     expect(importarCatalogo).not.toHaveBeenCalled();
+  });
+
+  test("concuerda el aviso cuando falta una sola columna", async () => {
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await elegir(
+      usuario,
+      archivoCsv("nombre,codigo_barras,categoria\nYerba,7790895000782,Almacén"),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Al archivo le falta una columna obligatoria: unidad_medida. Agregala y volvé a elegir el archivo.",
+    );
+  });
+
+  test("deja volver a elegir el mismo archivo después de corregirlo", async () => {
+    // Un input de archivo no dispara `change` dos veces con el mismo archivo si
+    // no se le limpia el value. Sin eso, el "corregila y volvé a elegir el
+    // archivo" que dice el aviso no funcionaría nunca.
+    const usuario = userEvent.setup();
+    renderizar();
+
+    const roto = archivoCsv("nombre,codigo_barras\nYerba,7790895000782");
+    await elegir(usuario, roto);
+    await screen.findByRole("alert");
+
+    // Mismo nombre de archivo, contenido corregido: es lo que devuelve Excel
+    // después de agregar la columna y guardar.
+    await elegir(usuario, archivoCsv());
+
+    expect(
+      await screen.findByRole("button", { name: /Confirmar carga/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  test("frena el archivo que pasa las 1000 filas sin subirlo", async () => {
+    const usuario = userEvent.setup();
+    const filas = Array.from(
+      { length: 1001 },
+      (_, i) => `Producto ${i},${1000000 + i},Almacén,unidad`,
+    ).join("\n");
+    renderizar();
+
+    await elegir(
+      usuario,
+      archivoCsv(`nombre,codigo_barras,categoria,unidad_medida\n${filas}`),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "El archivo tiene 1001 filas y el máximo es 1000",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Confirmar carga/ }),
+    ).not.toBeInTheDocument();
+    expect(importarCatalogo).not.toHaveBeenCalled();
+  });
+
+  test("un archivo de un solo producto no dice '1 productos'", async () => {
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await elegir(
+      usuario,
+      archivoCsv(
+        "nombre,codigo_barras,categoria,unidad_medida\nYerba,7790895000782,Almacén,unidad",
+      ),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Confirmar carga de 1 producto" }),
+    ).toBeInTheDocument();
   });
 
   test("rechaza otra extensión sin leer ni subir el archivo", async () => {
@@ -204,7 +277,7 @@ describe("respuesta del backend", () => {
     );
 
     expect(
-      await screen.findByText("Se importaron los 2 productos del archivo."),
+      await screen.findByText("Se importaron 2 productos: el archivo entró completo."),
     ).toBeInTheDocument();
   });
 
@@ -260,7 +333,7 @@ describe("respuesta del backend", () => {
     expect(screen.getByText(/puede tardar un momento/)).toBeInTheDocument();
 
     resolver(REPORTE_LIMPIO);
-    await screen.findByText("Se importaron los 2 productos del archivo.");
+    await screen.findByText("Se importaron 2 productos: el archivo entró completo.");
   });
 });
 

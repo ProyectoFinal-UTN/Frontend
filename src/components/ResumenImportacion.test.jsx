@@ -53,12 +53,32 @@ describe("estado completo", () => {
     renderizar(reporte());
 
     expect(
-      screen.getByText("Se importaron los 3 productos del archivo."),
+      screen.getByText("Se importaron 3 productos: el archivo entró completo."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/quedaron sin cargar/)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Descargar los errores/ }),
     ).not.toBeInTheDocument();
+  });
+
+  test("con un solo producto concuerda el verbo y el sustantivo", () => {
+    renderizar(
+      reporte({
+        totalFilas: 1,
+        procesadas: 1,
+        importados: 1,
+        productos: [
+          { fila: 2, id: "p1", nombre: "Yerba", codigoBarras: "111111" },
+        ],
+      }),
+    );
+
+    expect(
+      screen.getByText("Se importó 1 producto: el archivo entró completo."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ver el producto importado"),
+    ).toBeInTheDocument();
   });
 });
 

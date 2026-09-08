@@ -275,6 +275,7 @@ function estaVacia({ celdas }) {
  *   filas: {fila: number, celdas: string[]}[],
  *   totalFilas: number,
  *   faltantes: string[],
+ *   excedeMaximo: boolean,
  *   error: string,
  * }}
  */
@@ -284,6 +285,7 @@ export function leerCsv(texto, { maxFilas = FILAS_EN_PREVIA } = {}) {
     filas: [],
     totalFilas: 0,
     faltantes: [],
+    excedeMaximo: false,
     error: "",
   };
 
@@ -334,8 +336,23 @@ export function leerCsv(texto, { maxFilas = FILAS_EN_PREVIA } = {}) {
     filas: conDatos.slice(0, maxFilas),
     totalFilas: conDatos.length,
     faltantes,
+    // El backend rechaza el archivo entero pasado el tope. Como acá ya se
+    // contaron las filas, avisarlo antes de subir sale gratis: si no, un
+    // catálogo de 1500 filas viaja completo para volver con un 400.
+    excedeMaximo: conDatos.length > MAXIMO_FILAS,
     error: "",
   };
+}
+
+/**
+ * "1 producto" / "12 productos".
+ *
+ * Existe porque el caso de una sola fila es el que alguien usa para probar la
+ * importación por primera vez, y "Confirmar carga de 1 productos" es la primera
+ * impresión que deja la pantalla.
+ */
+export function contarProductos(cantidad) {
+  return cantidad === 1 ? "1 producto" : `${cantidad} productos`;
 }
 
 /**

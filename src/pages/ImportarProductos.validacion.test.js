@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   armarCsvDeErrores,
   armarPlantillaCsv,
+  contarProductos,
   leerCsv,
   validarArchivo,
 } from "./ImportarProductos.validacion";
@@ -167,6 +168,26 @@ describe("leerCsv", () => {
     expect(leerCsv(ENCABEZADO).error).toMatch(/ninguna fila de datos/);
   });
 
+  test("avisa cuando el archivo pasa el tope de 1000 filas", () => {
+    // Ya se contaron acá, así que frenarlo antes de subir sale gratis: si no,
+    // el archivo viaja entero para volver con un 400.
+    const filas = Array.from(
+      { length: 1001 },
+      (_, i) => `Producto ${i},${1000000 + i},Almacén,unidad`,
+    ).join("\n");
+
+    expect(leerCsv(`${ENCABEZADO}\n${filas}`).excedeMaximo).toBe(true);
+  });
+
+  test("no avisa de más justo en el tope", () => {
+    const filas = Array.from(
+      { length: 1000 },
+      (_, i) => `Producto ${i},${1000000 + i},Almacén,unidad`,
+    ).join("\n");
+
+    expect(leerCsv(`${ENCABEZADO}\n${filas}`).excedeMaximo).toBe(false);
+  });
+
   test("corta la previa en maxFilas pero informa el total", () => {
     const filas = Array.from(
       { length: 25 },
@@ -177,6 +198,14 @@ describe("leerCsv", () => {
 
     expect(previa.filas).toHaveLength(10);
     expect(previa.totalFilas).toBe(25);
+  });
+});
+
+describe("contarProductos", () => {
+  test("no dice '1 productos'", () => {
+    expect(contarProductos(1)).toBe("1 producto");
+    expect(contarProductos(0)).toBe("0 productos");
+    expect(contarProductos(12)).toBe("12 productos");
   });
 });
 
