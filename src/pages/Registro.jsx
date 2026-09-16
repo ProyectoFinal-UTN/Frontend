@@ -1,18 +1,17 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { registrar } from "../services/auth";
 import Campo from "../components/Campo";
-import { iniciarSesion } from "../services/auth";
-import { validarLogin } from "./Login.validacion";
+import { validarRegistro } from "./Registro.validacion";
 
-export default function Login() {
+export default function Registro() {
   const navegar = useNavigate();
-  const ubicacion = useLocation();
 
-  // Si llegó acá porque intentó entrar a una pantalla protegida, vuelve a esa
-  // en vez de al inicio. `RutaProtegida` deja la ruta original en el state.
-  const destino = ubicacion.state?.desde ?? "/";
-
-  const [campos, setCampos] = useState({ correo: "", password: "" });
+  const [campos, setCampos] = useState({
+    correo: "",
+    password: "",
+    confirmacion: "",
+  });
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -20,6 +19,8 @@ export default function Login() {
   function alEscribir(evento) {
     const { name, value } = evento.target;
     setCampos((previos) => ({ ...previos, [name]: value }));
+    // El error se limpia apenas tocan el campo: dejarlo mientras corrigen
+    // es molesto.
     setErrores((previos) => ({ ...previos, [name]: undefined }));
     setErrorGeneral("");
   }
@@ -27,7 +28,7 @@ export default function Login() {
   async function alEnviar(evento) {
     evento.preventDefault();
 
-    const encontrados = validarLogin(campos);
+    const encontrados = validarRegistro(campos);
     setErrores(encontrados);
 
     if (Object.keys(encontrados).length > 0) {
@@ -37,7 +38,7 @@ export default function Login() {
     setEnviando(true);
     setErrorGeneral("");
 
-    const resultado = await iniciarSesion({
+    const resultado = await registrar({
       correo: campos.correo.trim(),
       password: campos.password,
     });
@@ -45,14 +46,12 @@ export default function Login() {
     setEnviando(false);
 
     if (!resultado.ok) {
-      // El backend responde igual ante correo inexistente y contraseña
-      // incorrecta, para que no se pueda averiguar qué correos están
-      // registrados. El mensaje que llega ya refleja esa ambigüedad.
       setErrorGeneral(resultado.error);
       return;
     }
 
-    navegar(destino, { replace: true });
+    // El registro deja la sesión iniciada, así que se entra directo.
+    navegar("/", { replace: true });
   }
 
   return (
@@ -60,10 +59,10 @@ export default function Login() {
       <div className="mx-auto w-full max-w-sm">
         <header className="mb-8">
           <h1 className="text-3xl font-extrabold text-(--color-texto)">
-            Iniciar sesión
+            Creá tu cuenta
           </h1>
           <p className="mt-2 text-(--color-texto-apagado)">
-            Entrá para seguir controlando tu stock.
+            Empezá a controlar el stock de tu negocio.
           </p>
         </header>
 
@@ -93,10 +92,20 @@ export default function Login() {
             id="password"
             etiqueta="Contraseña"
             type="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
             value={campos.password}
             onChange={alEscribir}
             error={errores.password}
+          />
+
+          <Campo
+            id="confirmacion"
+            etiqueta="Repetí la contraseña"
+            type="password"
+            autoComplete="new-password"
+            value={campos.confirmacion}
+            onChange={alEscribir}
+            error={errores.confirmacion}
           />
 
           <button
@@ -107,30 +116,17 @@ export default function Login() {
                        hover:opacity-90 focus:outline-none focus:ring-4
                        focus:ring-(--color-primario-suave) disabled:opacity-60"
           >
-            {enviando ? "Entrando…" : "Entrar"}
+            {enviando ? "Creando cuenta…" : "Crear cuenta"}
           </button>
         </form>
 
-        {/*
-          Va debajo del formulario y no arriba: quien entra bien no necesita
-          verlo, y quien no puede entrar ya está mirando para acá (HU-3).
-        */}
-        <p className="mt-4 text-center text-sm">
-          <Link
-            to="/recuperar"
-            className="font-bold text-(--color-primario) underline"
-          >
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </p>
-
         <p className="mt-6 text-center text-sm text-(--color-texto-apagado)">
-          ¿Todavía no tenés cuenta?{" "}
+          ¿Ya tenés cuenta?{" "}
           <Link
-            to="/registro"
+            to="/login"
             className="font-bold text-(--color-primario) underline"
           >
-            Creá una
+            Iniciá sesión
           </Link>
         </p>
       </div>

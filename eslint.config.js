@@ -18,4 +18,11 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Corre en Node (config de build), no en el navegador — necesita `process`.
+    files: ['vite.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])
