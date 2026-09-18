@@ -279,6 +279,14 @@ export default function DetalleProducto() {
               </div>
             </>
           )}
+
+          {/* Cómo se llegó a este saldo: el historial ya filtrado (HU-14). */}
+          <Link
+            to={`/movimientos?productoId=${id}`}
+            className="mt-4 inline-block text-sm font-bold text-(--color-primario) underline"
+          >
+            Ver historial de movimientos →
+          </Link>
         </>
       )}
     </main>

@@ -3,6 +3,7 @@ import RutaProtegida from "./components/RutaProtegida";
 import Configuracion from "./pages/Configuracion";
 import DetalleProducto from "./pages/DetalleProducto";
 import EscanearProducto from "./pages/EscanearProducto";
+import HistorialMovimientos from "./pages/HistorialMovimientos";
 import ImportarProductos from "./pages/ImportarProductos";
 import Inicio from "./pages/Inicio";
 import Invitacion from "./pages/Invitacion";
@@ -69,6 +70,14 @@ export default function App() {
           element={
             <RutaProtegida>
               <ImportarProductos />
+            </RutaProtegida>
+          }
+        />
+        <Route
+          path="/movimientos"
+          element={
+            <RutaProtegida>
+              <HistorialMovimientos />
             </RutaProtegida>
           }
         />
