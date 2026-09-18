@@ -130,6 +130,7 @@ describe("DetalleProducto", () => {
       screen.getByLabelText("Sentido"),
       "Entrada (suma al stock)",
     );
+    await usuario.type(screen.getByLabelText("Motivo"), "Conteo de inventario");
     await usuario.click(screen.getByRole("button", { name: "Ajustar" }));
 
     await waitFor(() => {
@@ -138,6 +139,7 @@ describe("DetalleProducto", () => {
         tipo: "ajuste",
         cantidad: 5,
         sentido: "entrada",
+        motivo: "Conteo de inventario",
         ubicacionId: "u1",
       });
     });
@@ -184,7 +186,7 @@ describe("DetalleProducto", () => {
   // esas ramas no son alcanzables ni desde acá ni desde un E2E: se cubren
   // sobre la `validarCantidad` que esta pantalla importa, en
   // RegistrarMovimiento.validacion.test.js.
-  test("rechaza un ajuste sin cantidad ni sentido, sin llamar al service", async () => {
+  test("rechaza un ajuste sin cantidad, sentido ni motivo, sin llamar al service", async () => {
     const usuario = userEvent.setup();
     obtenerProducto.mockResolvedValueOnce(
       productoConStock({
@@ -208,6 +210,77 @@ describe("DetalleProducto", () => {
     expect(
       screen.getByText("Indicá si el ajuste suma o resta stock."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText("Escribí el motivo de este movimiento."),
+    ).toBeInTheDocument();
     expect(registrarMovimiento).not.toHaveBeenCalled();
+  });
+
+  // Esta pantalla registra siempre un `ajuste`, que es de los tipos que el
+  // backend rechaza sin motivo (HU-15). Sin estos casos, el formulario mandaba
+  // el POST igual y el 400 aparecía recién en producción.
+  test("no deja ajustar con un motivo en blanco", async () => {
+    const usuario = userEvent.setup();
+    obtenerProducto.mockResolvedValueOnce(
+      productoConStock({
+        stock: {
+          porUbicacion: [
+            { ubicacionId: "u1", ubicacionNombre: "Local", cantidad: 7 },
+          ],
+          total: 7,
+        },
+      }),
+    );
+
+    renderizar();
+    await screen.findByText("Local");
+
+    await usuario.type(screen.getByLabelText("Cantidad"), "2");
+    await usuario.selectOptions(
+      screen.getByLabelText("Sentido"),
+      "Salida (resta del stock)",
+    );
+    // Espacios y no vacío: para JavaScript es una cadena con contenido, pero el
+    // backend le hace `trim()` y responde 400 igual que con un motivo ausente.
+    await usuario.type(screen.getByLabelText("Motivo"), "   ");
+    await usuario.click(screen.getByRole("button", { name: "Ajustar" }));
+
+    expect(
+      await screen.findByText("Escribí el motivo de este movimiento."),
+    ).toBeInTheDocument();
+    expect(registrarMovimiento).not.toHaveBeenCalled();
+  });
+
+  test("limpia el motivo despues de ajustar, para que no se reuse en el siguiente", async () => {
+    const usuario = userEvent.setup();
+    obtenerProducto.mockResolvedValue(
+      productoConStock({
+        stock: {
+          porUbicacion: [
+            { ubicacionId: "u1", ubicacionNombre: "Local", cantidad: 7 },
+          ],
+          total: 7,
+        },
+      }),
+    );
+    registrarMovimiento.mockResolvedValueOnce({
+      movimiento: {},
+      stock: { cantidad: 5 },
+    });
+
+    renderizar();
+    await screen.findByText("Local");
+
+    await usuario.type(screen.getByLabelText("Cantidad"), "2");
+    await usuario.selectOptions(
+      screen.getByLabelText("Sentido"),
+      "Salida (resta del stock)",
+    );
+    await usuario.type(screen.getByLabelText("Motivo"), "Rotura");
+    await usuario.click(screen.getByRole("button", { name: "Ajustar" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Motivo")).toHaveValue("");
+    });
   });
 });

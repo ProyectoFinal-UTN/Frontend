@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import RegistrarMovimiento from "./RegistrarMovimiento";
@@ -214,6 +214,9 @@ describe("Sentido del ajuste", () => {
 
     await completarBase({ tipo: "ajuste" });
     await userEvent.click(screen.getByRole("radio", { name: /salida/i }));
+    // El ajuste tampoco sale sin motivo (HU-15): sin esto no habría envío que
+    // mirar.
+    await userEvent.type(screen.getByLabelText("Motivo"), "Conteo");
     await userEvent.click(botonRegistrar());
 
     expect(ultimoEnvio()).toMatchObject({ tipo: "ajuste", sentido: "salida" });
@@ -621,5 +624,98 @@ describe("Otros errores del backend", () => {
       /el producto no existe/i,
     );
     expect(screen.queryByText(/corregí la cantidad/i)).toBeNull();
+  });
+});
+
+describe("Motivo del ajuste y la merma", () => {
+  test("solo se pide en el ajuste y en la merma", async () => {
+    renderizar();
+    await screen.findByLabelText("Producto");
+
+    const tipo = screen.getByLabelText("Tipo de movimiento");
+
+    // La compra y la venta se explican solas: pedirles un motivo le sumaria un
+    // paso al flujo mas usado del sistema, que es lo que el RNF1 pide evitar.
+    for (const sinMotivo of ["compra", "venta"]) {
+      await userEvent.selectOptions(tipo, sinMotivo);
+      expect(screen.queryByLabelText("Motivo")).not.toBeInTheDocument();
+    }
+
+    for (const conMotivo of ["ajuste", "merma"]) {
+      await userEvent.selectOptions(tipo, conMotivo);
+      expect(screen.getByLabelText("Motivo")).toBeInTheDocument();
+    }
+  });
+
+  test("una merma sin motivo no se envia", async () => {
+    renderizar();
+    await screen.findByLabelText("Producto");
+
+    await completarBase({ tipo: "merma" });
+    await userEvent.click(botonRegistrar());
+
+    expect(registrarMovimiento).not.toHaveBeenCalled();
+    expect(screen.getByText(/escribí el motivo/i)).toBeInTheDocument();
+  });
+
+  test("un motivo de solo espacios tampoco se envia", async () => {
+    renderizar();
+    await screen.findByLabelText("Producto");
+
+    await completarBase({ tipo: "merma" });
+    // Para JavaScript es una cadena con contenido, pero el backend le hace
+    // `trim()` y responde 400 igual que con el campo vacio.
+    await userEvent.type(screen.getByLabelText("Motivo"), "   ");
+    await userEvent.click(botonRegistrar());
+
+    expect(registrarMovimiento).not.toHaveBeenCalled();
+    expect(screen.getByText(/escribí el motivo/i)).toBeInTheDocument();
+  });
+
+  test("viaja recortado en el body", async () => {
+    renderizar();
+    await screen.findByLabelText("Producto");
+
+    await completarBase({ tipo: "merma" });
+    await userEvent.type(screen.getByLabelText("Motivo"), "  Se venció  ");
+    await userEvent.click(botonRegistrar());
+
+    // Lo que se guarda es lo que el backend recorta: mandarlo ya recortado hace
+    // que el formulario y el libro digan lo mismo.
+    expect(ultimoEnvio()).toMatchObject({ tipo: "merma", motivo: "Se venció" });
+  });
+
+  test("cambiar de merma a otro tipo no deja el motivo colgado", async () => {
+    renderizar();
+    await screen.findByLabelText("Producto");
+
+    await completarBase({ tipo: "merma" });
+    await userEvent.type(screen.getByLabelText("Motivo"), "Se venció");
+    await userEvent.selectOptions(
+      screen.getByLabelText("Tipo de movimiento"),
+      "compra",
+    );
+    await userEvent.click(botonRegistrar());
+
+    // Sin esto, una compra quedaba registrada con la explicacion de una merma
+    // que nunca ocurrio — y el libro es append-only, esa fila no se corrige.
+    expect(ultimoEnvio()).not.toHaveProperty("motivo");
+  });
+
+  test("despues de registrar, el motivo queda vacio y no se reusa", async () => {
+    renderizar();
+    await screen.findByLabelText("Producto");
+
+    await completarBase({ tipo: "merma" });
+    await userEvent.type(screen.getByLabelText("Motivo"), "Se venció");
+    await userEvent.click(botonRegistrar());
+
+    // El tipo sigue elegido (eso es lo que hace que el segundo movimiento
+    // cueste un paso), pero dos mermas seguidas del mismo producto casi nunca
+    // son por lo mismo: reusar el motivo escribiria en el libro una explicacion
+    // que nadie eligio para esa fila.
+    await waitFor(() => {
+      expect(screen.getByLabelText("Motivo")).toHaveValue("");
+    });
   });
 });

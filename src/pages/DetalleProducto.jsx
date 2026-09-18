@@ -8,7 +8,10 @@ import {
   TIPO_CON_SENTIDO,
   registrarMovimiento,
 } from "../services/movimientos";
-import { validarCantidad } from "./RegistrarMovimiento.validacion";
+import {
+  validarCantidad,
+  validarMotivo,
+} from "./RegistrarMovimiento.validacion";
 
 /**
  * Stock de un producto, discriminado por ubicación (HU-11).
@@ -33,6 +36,7 @@ import { validarCantidad } from "./RegistrarMovimiento.validacion";
 function FilaStock({ fila, productoId, alAjustar }) {
   const [cantidad, setCantidad] = useState("");
   const [sentido, setSentido] = useState("");
+  const [motivo, setMotivo] = useState("");
   const [errores, setErrores] = useState({});
   const [guardando, setGuardando] = useState(false);
 
@@ -40,11 +44,15 @@ function FilaStock({ fila, productoId, alAjustar }) {
     evento.preventDefault();
 
     const errorCantidad = validarCantidad(cantidad);
+    // Este formulario registra siempre un `ajuste`, que es de los tipos que
+    // exigen motivo (HU-15): acá no hay tipo que mirar, se pide y punto.
+    const errorMotivo = validarMotivo(motivo);
     const nuevosErrores = {};
     if (errorCantidad) nuevosErrores.cantidad = errorCantidad;
     if (!SENTIDOS.some(({ valor }) => valor === sentido)) {
       nuevosErrores.sentido = "Indicá si el ajuste suma o resta stock.";
     }
+    if (errorMotivo) nuevosErrores.motivo = errorMotivo;
 
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
@@ -60,10 +68,14 @@ function FilaStock({ fila, productoId, alAjustar }) {
         tipo: TIPO_CON_SENTIDO,
         cantidad: Number(cantidad),
         sentido,
+        motivo: motivo.trim(),
         ubicacionId: fila.ubicacionId,
       });
       setCantidad("");
       setSentido("");
+      // El motivo se limpia con el resto: dos ajustes seguidos sobre la misma
+      // ubicación rara vez son por lo mismo, y el libro no se corrige después.
+      setMotivo("");
       alAjustar();
     } catch (fallo) {
       setErrores({ general: fallo.message });
@@ -84,38 +96,58 @@ function FilaStock({ fila, productoId, alAjustar }) {
       <form
         onSubmit={ajustar}
         aria-label={`Ajustar stock en ${fila.ubicacionNombre}`}
-        className="mt-2 flex flex-col gap-2 sm:flex-row"
+        className="mt-2 flex flex-col gap-2"
       >
-        <div className="flex-1">
-          <Campo
-            id={`cantidad-${fila.ubicacionId}`}
-            etiqueta="Cantidad"
-            type="number"
-            min="1"
-            inputMode="numeric"
-            value={cantidad}
-            onChange={(evento) => setCantidad(evento.target.value)}
-            error={errores.cantidad}
-          />
-        </div>
-        <div className="flex-1">
-          <CampoSelect
-            id={`sentido-${fila.ubicacionId}`}
-            etiqueta="Sentido"
-            value={sentido}
-            onChange={(evento) => setSentido(evento.target.value)}
-            error={errores.sentido}
-          >
-            <option value="" disabled>
-              Elegí una opción
-            </option>
-            {SENTIDOS.map(({ valor, etiqueta }) => (
-              <option key={valor} value={valor}>
-                {etiqueta}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex-1">
+            <Campo
+              id={`cantidad-${fila.ubicacionId}`}
+              etiqueta="Cantidad"
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={cantidad}
+              onChange={(evento) => setCantidad(evento.target.value)}
+              error={errores.cantidad}
+            />
+          </div>
+          <div className="flex-1">
+            <CampoSelect
+              id={`sentido-${fila.ubicacionId}`}
+              etiqueta="Sentido"
+              value={sentido}
+              onChange={(evento) => setSentido(evento.target.value)}
+              error={errores.sentido}
+            >
+              <option value="" disabled>
+                Elegí una opción
               </option>
-            ))}
-          </CampoSelect>
+              {SENTIDOS.map(({ valor, etiqueta }) => (
+                <option key={valor} value={valor}>
+                  {etiqueta}
+                </option>
+              ))}
+            </CampoSelect>
+          </div>
         </div>
+
+        {/*
+          El motivo va en su propia línea y no en la fila de arriba: son varias
+          de estas por producto, una por ubicación, y meterle un tercer campo al
+          renglón dejaba tres inputs y un botón apretados en la pantalla de un
+          teléfono, que es donde el RNF1 pide que esto funcione.
+        */}
+        <Campo
+          id={`motivo-${fila.ubicacionId}`}
+          etiqueta="Motivo"
+          type="text"
+          autoComplete="off"
+          placeholder="Conteo de inventario, rotura, se venció…"
+          value={motivo}
+          onChange={(evento) => setMotivo(evento.target.value)}
+          error={errores.motivo}
+        />
+
         <button
           type="submit"
           disabled={guardando}

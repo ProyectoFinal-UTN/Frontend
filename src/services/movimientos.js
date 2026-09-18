@@ -50,6 +50,23 @@ export const SENTIDOS = [
 ];
 
 /**
+ * Tipos que el backend no acepta sin una explicación escrita (HU-15).
+ *
+ * Una compra o una venta se explican solas: hubo una operación comercial
+ * detrás. Un ajuste y una merma, no —son la corrección de una diferencia entre
+ * el stock del sistema y el real—, y sin el motivo el libro dice que faltan
+ * seis unidades pero no por qué. Ese "por qué" es lo que hace auditable la
+ * corrección.
+ *
+ * Espeja `TIPOS_QUE_EXIGEN_MOTIVO` en `movimientos.service.js` del backend: si
+ * cambia allá, hay que cambiarlo acá.
+ */
+export const TIPOS_QUE_EXIGEN_MOTIVO = ["ajuste", "merma"];
+
+/** Largo de `movimiento.motivo`, que es un varchar(255) en la base. */
+export const MOTIVO_MAXIMO = 255;
+
+/**
  * Registra el movimiento y actualiza el stock, en una sola transacción del lado
  * del backend.
  *
@@ -59,6 +76,11 @@ export const SENTIDOS = [
  *
  * `ubicacionId` se omite cuando el comercio tiene una sola ubicación —el
  * backend la resuelve—; con más de una es obligatorio y sin él responde 400.
+ *
+ * `motivo` es obligatorio en los tipos de `TIPOS_QUE_EXIGEN_MOTIVO` (HU-15) y
+ * opcional en los demás. Viaja recortado: el backend le hace `trim()` y una
+ * cadena en blanco le vale lo mismo que no mandar nada, así que un motivo de
+ * solo espacios vuelve con un 400 igual que uno vacío.
  *
  * Responde **409 si no hay stock suficiente** para descontar, con un mensaje
  * que ya nombra las unidades disponibles. Ese caso se muestra tal cual y no

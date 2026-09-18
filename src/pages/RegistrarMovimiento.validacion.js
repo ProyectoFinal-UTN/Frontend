@@ -1,6 +1,8 @@
 import {
+  MOTIVO_MAXIMO,
   SENTIDOS,
   TIPOS_MOVIMIENTO,
+  TIPOS_QUE_EXIGEN_MOTIVO,
   TIPO_CON_SENTIDO,
 } from "../services/movimientos";
 
@@ -44,6 +46,16 @@ export function validarMovimiento(campos, { pideUbicacion = false } = {}) {
     !SENTIDOS.some(({ valor }) => valor === campos.sentido)
   ) {
     errores.sentido = "Indicá si el ajuste suma o resta stock.";
+  }
+
+  // El motivo solo se exige en el ajuste y en la merma (HU-15), que son los dos
+  // tipos que corrigen una diferencia contra el stock real. En los otros dos el
+  // campo ni se muestra, así que llega siempre vacío y no hay nada que medir.
+  if (TIPOS_QUE_EXIGEN_MOTIVO.includes(campos.tipo)) {
+    const motivo = validarMotivo(campos.motivo);
+    if (motivo) {
+      errores.motivo = motivo;
+    }
   }
 
   const cantidad = validarCantidad(campos.cantidad);
@@ -100,6 +112,38 @@ export function validarCantidad(valor) {
 
   if (Number(texto) > MAXIMO_ENTERO) {
     return `No puede superar ${MAXIMO_ENTERO}.`;
+  }
+
+  return null;
+}
+
+/**
+ * Reglas del motivo de un ajuste o una merma (HU-15).
+ *
+ * Solo la llama quien ya sabe que el motivo es obligatorio: acá adentro no se
+ * mira el tipo. Eso la deja servir a las dos pantallas que registran un ajuste
+ * —`RegistrarMovimiento`, que decide por el tipo elegido, y `DetalleProducto`,
+ * donde el tipo es siempre `ajuste`— sin que ninguna repita la regla.
+ *
+ * El `trim()` antes de medir es el mismo criterio que aplica el backend:
+ * "   " es una cadena no vacía para JavaScript, pero no es un motivo, y del
+ * otro lado vuelve con un 400.
+ *
+ * El tope de 255 se chequea acá aunque el campo podría declarar un `maxLength`
+ * que lo haga imposible: el atributo recorta en silencio, y perder sin aviso lo
+ * que alguien terminó de escribir es peor que decirle que se pasó.
+ *
+ * @returns el mensaje de error, o `null` si el valor sirve.
+ */
+export function validarMotivo(valor) {
+  const texto = String(valor ?? "").trim();
+
+  if (!texto) {
+    return "Escribí el motivo de este movimiento.";
+  }
+
+  if (texto.length > MOTIVO_MAXIMO) {
+    return `No puede superar ${MOTIVO_MAXIMO} caracteres.`;
   }
 
   return null;
