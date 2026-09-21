@@ -104,7 +104,9 @@ async function completar({ cantidad = "5", motivo = "" } = {}) {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // `reset` y no `clear`: `clear` deja en la cola los `mockResolvedValueOnce`
+  // que un test roto no llegó a consumir, y se los come el test siguiente.
+  vi.resetAllMocks();
   obtenerProductos.mockResolvedValue([YERBA]);
   obtenerUbicaciones.mockResolvedValue(DOS_UBICACIONES);
   obtenerProducto.mockResolvedValue(conStock());
@@ -183,6 +185,18 @@ describe("formulario", () => {
     expect(campo.destino()).toHaveValue("");
   });
 
+  // El destino no puede quedar escondido en el estado y volver solo: al
+  // volver al origen anterior reaparecería elegido sin que nadie lo elija.
+  test("un destino descartado por el origen no vuelve al cambiar el origen otra vez", async () => {
+    renderizar();
+    await elegirBase();
+
+    await userEvent.selectOptions(campo.origen(), "u2");
+    await userEvent.selectOptions(campo.origen(), "u1");
+
+    expect(campo.destino()).toHaveValue("");
+  });
+
   test("muestra el disponible en origen apenas hay producto y origen, y el saldo en cada opción", async () => {
     renderizar();
     await screen.findByRole("form", { name: "Transferir stock" });
@@ -225,7 +239,76 @@ describe("formulario", () => {
     await userEvent.selectOptions(campo.origen(), "u1");
 
     expect(await within(disponible()).findByText("El producto no existe")).toBeInTheDocument();
-    await userEvent.click(within(disponible()).getByRole("button", { name: "Reintentar" }));
+    // Sin disponible conocido no se deja enviar: sería renunciar al bloqueo.
+    expect(botonTransferir()).toBeDisabled();
+    await userEvent.click(within(disponible()).getByRole("button", { name: "Consultar de nuevo" }));
+
+    await waitFor(() =>
+      expect(disponible()).toHaveTextContent("Disponible en Depósito: 12 unidades"),
+    );
+    expect(obtenerProducto).toHaveBeenCalledTimes(2);
+  });
+
+  // Si el producto se dio de baja desde otra pantalla, volver a pedir su stock
+  // falla igual cada vez. «Consultar de nuevo» recarga también las listas, y
+  // así el producto que ya no existe se cae del formulario.
+  test("si el producto ya no existe, «Consultar de nuevo» recarga el catálogo y lo saca del formulario", async () => {
+    const FERNET = { id: "p2", nombre: "Fernet 750ml", unidadMedida: "unidad" };
+    obtenerProductos
+      .mockResolvedValueOnce([YERBA, FERNET])
+      .mockResolvedValueOnce([FERNET]);
+    obtenerProducto.mockRejectedValue(fallo(404, "El producto no existe"));
+    renderizar();
+    await screen.findByRole("form", { name: "Transferir stock" });
+    await userEvent.selectOptions(campo.producto(), "p1");
+    await userEvent.selectOptions(campo.origen(), "u1");
+    await within(disponible()).findByText("El producto no existe");
+
+    await userEvent.click(within(disponible()).getByRole("button", { name: "Consultar de nuevo" }));
+
+    await waitFor(() => expect(campo.producto()).toHaveValue(""));
+    expect(obtenerProductos).toHaveBeenCalledTimes(2);
+    expect(obtenerUbicaciones).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("transferencia-disponible")).not.toBeInTheDocument();
+    expect(within(campo.producto()).queryByRole("option", { name: "Yerba Playadito 1kg" })).not.toBeInTheDocument();
+  });
+
+  test("si la consulta del stock falla por sesión vencida, ofrece volver a iniciar sesión", async () => {
+    obtenerProducto.mockRejectedValue(fallo(401, "No hay sesion activa"));
+    renderizar();
+    await screen.findByRole("form", { name: "Transferir stock" });
+
+    await userEvent.selectOptions(campo.producto(), "p1");
+    await userEvent.selectOptions(campo.origen(), "u1");
+
+    await within(disponible()).findByText("No hay sesion activa");
+    expect(within(disponible()).getByRole("link", { name: "Volver a iniciar sesión" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+  });
+
+  // Pasa si la ubicación se creó después de consultar el stock. El cartel
+  // tiene que ofrecer la salida que promete, no decir "esperá" a una consulta
+  // que ya terminó y no se va a repetir sola.
+  test("si el origen no figura en el stock consultado, no deja enviar y ofrece consultar de nuevo", async () => {
+    const soloLocal = conStock();
+    soloLocal.stock.porUbicacion = soloLocal.stock.porUbicacion.filter(
+      (fila) => fila.ubicacionId !== "u1",
+    );
+    obtenerProducto.mockResolvedValueOnce(soloLocal).mockResolvedValueOnce(conStock());
+    renderizar();
+    await screen.findByRole("form", { name: "Transferir stock" });
+
+    await userEvent.selectOptions(campo.producto(), "p1");
+    await userEvent.selectOptions(campo.origen(), "u1");
+
+    await waitFor(() =>
+      expect(disponible()).toHaveTextContent(/^No sabemos cuánto hay en Depósito\.Consultar de nuevo$/),
+    );
+    expect(botonTransferir()).toBeDisabled();
+
+    await userEvent.click(within(disponible()).getByRole("button", { name: "Consultar de nuevo" }));
 
     await waitFor(() =>
       expect(disponible()).toHaveTextContent("Disponible en Depósito: 12 unidades"),
@@ -336,6 +419,44 @@ describe("bloqueo por stock en el cliente", () => {
       screen.getByText("Hay 12 unidades disponibles en Depósito. No podés transferir más."),
     ).toBeInTheDocument();
     expect(transferirStock).not.toHaveBeenCalled();
+  });
+
+  test("el error de stock se va al cambiar el origen, en vez de quedar nombrando al anterior", async () => {
+    obtenerProducto.mockResolvedValue(conStock({ deposito: 3, local: 50 }));
+    renderizar();
+    await screen.findByRole("form", { name: "Transferir stock" });
+    await userEvent.selectOptions(campo.producto(), "p1");
+    await userEvent.selectOptions(campo.origen(), "u1");
+    await waitFor(() => expect(disponible()).toHaveTextContent("Disponible en Depósito:"));
+    await userEvent.type(campo.cantidad(), "10");
+    await userEvent.click(botonTransferir());
+    expect(
+      screen.getByText("Hay 3 unidades disponibles en Depósito. No podés transferir más."),
+    ).toBeInTheDocument();
+
+    await userEvent.selectOptions(campo.origen(), "u2");
+
+    expect(screen.queryByText(/Hay 3 unidades disponibles/)).not.toBeInTheDocument();
+    expect(campo.cantidad()).toHaveAttribute("aria-invalid", "false");
+    expect(disponible()).toHaveTextContent("Disponible en Local: 50 unidades");
+  });
+
+  test("el error de stock se va al cambiar el producto", async () => {
+    const FERNET = { id: "p2", nombre: "Fernet 750ml", unidadMedida: "unidad" };
+    obtenerProductos.mockResolvedValue([YERBA, FERNET]);
+    obtenerProducto.mockResolvedValue(conStock({ deposito: 3 }));
+    renderizar();
+    await screen.findByRole("form", { name: "Transferir stock" });
+    await userEvent.selectOptions(campo.producto(), "p1");
+    await userEvent.selectOptions(campo.origen(), "u1");
+    await waitFor(() => expect(disponible()).toHaveTextContent("Disponible en Depósito:"));
+    await userEvent.type(campo.cantidad(), "10");
+    await userEvent.click(botonTransferir());
+    expect(screen.getByText(/Hay 3 unidades disponibles/)).toBeInTheDocument();
+
+    await userEvent.selectOptions(campo.producto(), "p2");
+
+    expect(screen.queryByText(/Hay 3 unidades disponibles/)).not.toBeInTheDocument();
   });
 
   test("con el formulario vacío marca los campos y no envía", async () => {
@@ -566,6 +687,33 @@ describe("errores del backend", () => {
       "href",
       "/movimientos?tipo=transferencia&productoId=p1",
     );
+    await waitFor(() => expect(obtenerProducto).toHaveBeenCalledTimes(2));
+  });
+
+  // Un 5xx —sobre todo el 502/503/504 del proxy de Render— puede llegar con
+  // la transacción ya confirmada del otro lado. Mostrarlo como "falló" invita
+  // a reenviar, y el endpoint no es idempotente.
+  test.each([
+    [500, "Error interno del servidor"],
+    [502, "No se pudo completar la operación (502)"],
+    [503, "No se pudo completar la operación (503)"],
+    [504, "No se pudo completar la operación (504)"],
+  ])("un %s se trata como no confirmado, igual que un error de red", async (status, mensaje) => {
+    transferirStock.mockRejectedValueOnce(fallo(status, mensaje));
+    renderizar();
+    await completar();
+
+    await userEvent.click(botonTransferir());
+
+    const error = await screen.findByTestId("transferencia-error");
+    expect(error).toHaveTextContent(
+      /^No pudimos confirmar si la transferencia se hizo\. Revisá el stock antes de volver a intentar\.Ver transferencias de este producto →$/,
+    );
+    expect(within(error).getByRole("link", { name: "Ver transferencias de este producto →" })).toHaveAttribute(
+      "href",
+      "/movimientos?tipo=transferencia&productoId=p1",
+    );
+    expect(within(error).queryByRole("button")).not.toBeInTheDocument();
     await waitFor(() => expect(obtenerProducto).toHaveBeenCalledTimes(2));
   });
 

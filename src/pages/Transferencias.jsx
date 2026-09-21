@@ -195,6 +195,8 @@ function FormularioTransferencia({
           version: versionStock,
           porUbicacion: null,
           error: fallo.message,
+          // Un 401 no se arregla consultando de nuevo: pide volver a entrar.
+          sesionVencida: fallo.status === 401,
         });
       });
 
@@ -225,6 +227,10 @@ function FormularioTransferencia({
 
   const disponible = origen ? saldoEn(origen) : null;
   const sinStock = disponible === 0;
+  // Con producto y origen elegidos pero sin saldo conocido —consultando,
+  // consulta fallida, u origen que no vino en la respuesta— no se deja enviar:
+  // sería renunciar al bloqueo por stock que pide la historia.
+  const stockDesconocido = Boolean(productoId && origen) && disponible === null;
 
   /** "Depósito (12 kg)" cuando se conoce el saldo; si no, solo el nombre. */
   function opcionUbicacion(ubicacion) {
@@ -237,12 +243,31 @@ function FormularioTransferencia({
   function alEscribir(evento) {
     const { name, value } = evento.target;
 
-    setCampos((previos) => ({ ...previos, [name]: value }));
+    setCampos((previos) => ({
+      ...previos,
+      [name]: value,
+      // Si el origen nuevo es el destino elegido, el destino se borra acá, en
+      // el estado. Esconderlo solo en el render (`seleccion`) no alcanza: al
+      // volver al origen anterior reaparecería elegido sin que nadie lo elija.
+      ...(name === "ubicacionOrigenId" && value === previos.ubicacionDestinoId
+        ? { ubicacionDestinoId: "" }
+        : {}),
+    }));
 
     // El error se limpia apenas tocan el campo, y la confirmación se va cuando
     // arranca la transferencia siguiente: si quedara, nombraría al producto
     // anterior mientras el formulario ya muestra otro.
-    setErrores((previos) => ({ ...previos, [name]: undefined }));
+    setErrores((previos) => ({
+      ...previos,
+      [name]: undefined,
+      // Estos dos errores dependen de más de un campo: el tope por stock sale
+      // del producto y del origen, y "distinto del origen" del origen. Si solo
+      // se limpiara el campo tocado, al cambiar de origen quedaría un «Hay 3
+      // en Depósito» debajo de un panel que ya dice 50 en Local.
+      ...(name === "productoId" || name === "ubicacionOrigenId"
+        ? { cantidad: undefined, ubicacionDestinoId: undefined }
+        : {}),
+    }));
     setErrorGeneral(null);
     setAvisoStock("");
     setConfirmacion(null);
@@ -253,6 +278,24 @@ function FormularioTransferencia({
   }
 
   /**
+   * La salida del panel cuando no se sabe cuánto hay en el origen.
+   *
+   * Recarga también el catálogo y las ubicaciones, no solo el stock: si el
+   * producto se dio de baja desde otra pantalla, volver a pedir su stock
+   * fallaría igual en cada click. Con las listas nuevas, lo que ya no existe
+   * se cae del formulario (`idVigente`) y el callejón se abre solo.
+   *
+   * No toca `errorGeneral`, a diferencia de `refrescar`: si hay un «no
+   * pudimos confirmar» en pantalla, tiene que seguir ahí.
+   */
+  async function consultarDeNuevo() {
+    setRefrescando(true);
+    await alRecargar({ conservarFormulario: true });
+    setRefrescando(false);
+    reconsultarStock();
+  }
+
+  /**
    * Qué mostrar según cómo falló el POST.
    *
    * El 409 va aparte, como aviso y no como error: es una respuesta del negocio
@@ -260,9 +303,12 @@ function FormularioTransferencia({
    * Por eso además de mostrarlo se vuelve a pedir el stock: el disponible que
    * se ve dejó de ser cierto.
    *
-   * Un fallo sin `status` es de red: la request pudo haber llegado y haberse
-   * aplicado. Decir "no se hizo" invita a reintentar y, con un endpoint que no
-   * es idempotente, a transferir dos veces.
+   * Un fallo sin `status` es de red, y un 5xx puede ser el proxy de Render
+   * cortando por tiempo (502/503/504) con la transacción ya confirmada del
+   * otro lado. En los dos casos la request pudo haberse aplicado: decir "no se
+   * hizo" invita a reintentar y, con un endpoint que no es idempotente, a
+   * transferir dos veces. Un 500 del backend casi siempre es un rollback,
+   * pero desde acá no se distingue: se lo trata igual.
    */
   function mostrarFallo(fallo) {
     if (fallo.status === 409) {
@@ -272,7 +318,7 @@ function FormularioTransferencia({
       return;
     }
 
-    if (!fallo.status) {
+    if (!fallo.status || fallo.status >= 500) {
       setErrorGeneral({ tipo: "red", mensaje: MENSAJE_SIN_CONFIRMAR });
       reconsultarStock();
       return;
@@ -542,22 +588,32 @@ function FormularioTransferencia({
           >
             {consultando && <p>Consultando stock…</p>}
 
-            {!consultando && errorStock && (
+            {/*
+              Dos formas de no saber cuánto hay: la consulta falló, o volvió
+              sin esta ubicación (se creó después de consultar). En las dos el
+              envío queda bloqueado, así que el cartel tiene que traer la
+              salida: nada se vuelve a consultar solo.
+            */}
+            {stockDesconocido && !consultando && (
               <>
-                <p className="text-(--color-peligro)">{errorStock}</p>
-                <button
-                  type="button"
-                  onClick={reconsultarStock}
-                  className={CLASES_BOTON_PELIGRO}
-                >
-                  Reintentar
-                </button>
+                <p className={errorStock ? "text-(--color-peligro)" : undefined}>
+                  {errorStock || `No sabemos cuánto hay en ${nombreOrigen}.`}
+                </p>
+                {stockVigente?.sesionVencida ? (
+                  <Link to="/login" className={`mt-2 inline-block ${CLASES_LINK}`}>
+                    Volver a iniciar sesión
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={refrescando}
+                    onClick={consultarDeNuevo}
+                    className={CLASES_BOTON_PELIGRO}
+                  >
+                    {refrescando ? "Consultando…" : "Consultar de nuevo"}
+                  </button>
+                )}
               </>
-            )}
-
-            {!consultando && !errorStock && disponible === null && (
-              // Una ubicación creada después de consultar el stock.
-              <p>No sabemos cuánto hay en {nombreOrigen}.</p>
             )}
 
             {!consultando && !errorStock && sinStock && (
@@ -648,7 +704,7 @@ function FormularioTransferencia({
 
         <button
           type="submit"
-          disabled={guardando || refrescando || consultando || sinStock}
+          disabled={guardando || refrescando || stockDesconocido || sinStock}
           className={CLASES_BOTON_PRIMARIO}
         >
           {guardando ? "Transfiriendo…" : "Transferir"}

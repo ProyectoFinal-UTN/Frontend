@@ -104,7 +104,7 @@ describe("validarTransferencia", () => {
         validarTransferencia(VALIDO, { ...CONTEXTO, disponible: null }),
       ).toEqual({
         cantidad:
-          "Todavía no sabemos cuánto hay en el origen. Esperá a que se consulte el stock.",
+          "Todavía no sabemos cuánto hay en el origen. Consultá el stock de nuevo.",
       });
     });
 

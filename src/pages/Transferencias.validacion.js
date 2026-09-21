@@ -101,7 +101,9 @@ function validarTope(campos, { disponible, unidad, nombreOrigen }) {
   }
 
   if (typeof disponible !== "number") {
-    return "Todavía no sabemos cuánto hay en el origen. Esperá a que se consulte el stock.";
+    // Normalmente no se llega: la pantalla deshabilita el envío en este caso.
+    // Si se llega, el mensaje no puede decir "esperá": nada se consulta solo.
+    return "Todavía no sabemos cuánto hay en el origen. Consultá el stock de nuevo.";
   }
 
   if (Number(campos.cantidad) <= disponible) {
