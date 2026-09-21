@@ -283,4 +283,42 @@ describe("DetalleProducto", () => {
       expect(screen.getByLabelText("Motivo")).toHaveValue("");
     });
   });
+
+  test("con dos ubicaciones ofrece transferir, con el producto ya elegido (HU-12)", async () => {
+    obtenerProducto.mockResolvedValueOnce(
+      productoConStock({
+        stock: {
+          porUbicacion: [
+            { ubicacionId: "u1", ubicacionNombre: "Local", cantidad: 7 },
+            { ubicacionId: "u2", ubicacionNombre: "Depósito", cantidad: 5 },
+          ],
+          total: 12,
+        },
+      }),
+    );
+
+    renderizar();
+
+    expect(
+      await screen.findByRole("link", { name: "Transferir entre ubicaciones →" }),
+    ).toHaveAttribute("href", "/transferencias?productoId=p1");
+  });
+
+  test("con una sola ubicación no ofrece transferir", async () => {
+    obtenerProducto.mockResolvedValueOnce(
+      productoConStock({
+        stock: {
+          porUbicacion: [{ ubicacionId: "u1", ubicacionNombre: "Local", cantidad: 7 }],
+          total: 7,
+        },
+      }),
+    );
+
+    renderizar();
+
+    await screen.findByText("Local");
+    expect(
+      screen.queryByRole("link", { name: "Transferir entre ubicaciones →" }),
+    ).not.toBeInTheDocument();
+  });
 });

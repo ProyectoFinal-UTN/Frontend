@@ -13,6 +13,7 @@ import Recuperar from "./pages/Recuperar";
 import Registro from "./pages/Registro";
 import RegistrarMovimiento from "./pages/RegistrarMovimiento";
 import Restablecer from "./pages/Restablecer";
+import Transferencias from "./pages/Transferencias";
 
 export default function App() {
   return (
@@ -86,6 +87,14 @@ export default function App() {
           element={
             <RutaProtegida>
               <RegistrarMovimiento />
+            </RutaProtegida>
+          }
+        />
+        <Route
+          path="/transferencias"
+          element={
+            <RutaProtegida>
+              <Transferencias />
             </RutaProtegida>
           }
         />

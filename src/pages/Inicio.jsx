@@ -52,6 +52,15 @@ export default function Inicio() {
         </Link>
 
         <Link
+          to="/transferencias"
+          className="rounded-(--radius) border-2 border-(--color-borde)
+                     bg-(--color-tarjeta) px-4 py-3 text-center font-bold text-(--color-texto)
+                     transition hover:border-(--color-primario)"
+        >
+          Transferir stock
+        </Link>
+
+        <Link
           to="/productos"
           className="rounded-(--radius) bg-(--color-primario) px-4 py-3 text-center
                      font-bold text-(--color-primario-texto) transition hover:opacity-90"
