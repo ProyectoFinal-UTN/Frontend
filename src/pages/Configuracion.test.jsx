@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Configuracion from "./Configuracion";
+import { configuracionDe } from "../tests/permisos";
 
 vi.mock("../services/configuracion", async (original) => ({
   ...(await original()),
@@ -14,8 +15,22 @@ vi.mock("../services/comercio", () => ({
   guardarPerfil: vi.fn(),
 }));
 
+// Las dos secciones que dependen de un permiso traen sus propios datos. Se
+// mockean para poder abrirlas en los tests de control de acceso sin red.
+vi.mock("../services/miembros", async (original) => ({
+  ...(await original()),
+  obtenerEquipo: vi.fn(),
+}));
+
+vi.mock("../services/auditoria", async (original) => ({
+  ...(await original()),
+  obtenerAuditoria: vi.fn(),
+}));
+
 const { obtenerConfiguracion } = await import("../services/configuracion");
 const { obtenerPerfil, guardarPerfil } = await import("../services/comercio");
+const { obtenerEquipo } = await import("../services/miembros");
+const { obtenerAuditoria } = await import("../services/auditoria");
 
 function renderizar(rutaInicial = "/configuracion") {
   return render(
@@ -27,17 +42,32 @@ function renderizar(rutaInicial = "/configuracion") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  obtenerConfiguracion.mockResolvedValue({
-    nombre: "Mi comercio",
-    moneda: "ARS",
-    ubicaciones: [{ id: "u1", nombre: "Depósito" }],
-  });
+  // Por defecto, propietario: es quien ve las cinco pestañas, así que los
+  // tests de armazón siguen valiendo tal cual. Los de control de acceso
+  // (HU-32) pisan este mock con el rol que les interesa.
+  obtenerConfiguracion.mockResolvedValue(
+    configuracionDe("propietario", {
+      nombre: "Mi comercio",
+      ubicaciones: [{ id: "u1", nombre: "Depósito" }],
+    }),
+  );
   obtenerPerfil.mockResolvedValue({
     nombre: "Mi comercio",
     rubro: null,
     direccion: null,
     telefono: null,
     correoContacto: null,
+  });
+  obtenerEquipo.mockResolvedValue({
+    miembros: [
+      { id: "m1", userId: "u9", nombre: "Ana", correo: "ana@kiosco.com", rol: "empleado" },
+    ],
+    invitaciones: [],
+    roles: [],
+  });
+  obtenerAuditoria.mockResolvedValue({
+    eventos: [],
+    filtros: { acciones: [], recursos: [] },
   });
 });
 
@@ -183,14 +213,14 @@ describe("Aviso de guardado del perfil (regresión)", () => {
     // Por eso el test vive acá: hace falta la pantalla entera, y hace falta que
     // la recarga devuelva un nombre distinto, que es lo que cambiaba el `key`.
     guardarPerfil.mockResolvedValue({});
-    // Sin el rol, `puedeEditar` queda en false y los campos salen `readOnly`:
-    // el formulario no se puede ni completar.
-    obtenerConfiguracion.mockResolvedValue({
-      nombre: "Mi comercio",
-      moneda: "ARS",
-      rol: "propietario",
-      ubicaciones: [{ id: "u1", nombre: "Depósito" }],
-    });
+    // Sin `comercio:update`, `puedeEditar` queda en false y los campos salen
+    // `readOnly`: el formulario no se puede ni completar.
+    obtenerConfiguracion.mockResolvedValue(
+      configuracionDe("propietario", {
+        nombre: "Mi comercio",
+        ubicaciones: [{ id: "u1", nombre: "Depósito" }],
+      }),
+    );
     obtenerPerfil
       .mockResolvedValueOnce({
         nombre: "Mi comercio",
@@ -219,5 +249,143 @@ describe("Aviso de guardado del perfil (regresión)", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       /datos guardados/i,
     );
+  });
+});
+
+describe("Control de acceso por rol (HU-32)", () => {
+  /**
+   * Espera a que las pestañas sean las definitivas y las devuelve.
+   *
+   * Hace falta esperar: hasta que llegan los permisos se muestran todas —ver
+   * "si no se pudo saber el rol"— así que leerlas en el primer render daría
+   * siempre cinco.
+   */
+  async function pestanasVisibles(esperadas) {
+    await waitFor(() =>
+      expect(screen.getAllByRole("tab")).toHaveLength(esperadas.length),
+    );
+    return screen.getAllByRole("tab").map((p) => p.textContent);
+  }
+
+  test("el propietario ve las cinco secciones", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
+
+    renderizar();
+
+    const esperadas = [
+      "Perfil del comercio",
+      "Ubicaciones y moneda",
+      "Usuarios y roles",
+      "Auditoría",
+      "Mis datos",
+    ];
+    expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
+  });
+
+  // El gerente tiene `member:read` pero no `auditoria`: ve el equipo, no el
+  // registro de accesos.
+  test("el gerente ve Usuarios pero no Auditoría", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
+
+    renderizar();
+
+    const esperadas = [
+      "Perfil del comercio",
+      "Ubicaciones y moneda",
+      "Usuarios y roles",
+      "Mis datos",
+    ];
+    expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
+    expect(screen.queryByTestId("pestana-auditoria")).not.toBeInTheDocument();
+  });
+
+  test("el gerente abre Usuarios en modo lectura", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
+    const usuario = userEvent.setup();
+
+    renderizar();
+    await usuario.click(await screen.findByTestId("pestana-usuarios"));
+
+    // Ve a su compañera…
+    expect(await screen.findByText("Ana")).toBeInTheDocument();
+    // …y ninguna de las cuatro acciones que no le corresponden.
+    expect(screen.queryByTestId("usuario-rol-m1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("usuario-quitar-m1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("usuarios-invitar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("usuarios-solo-lectura")).toBeInTheDocument();
+  });
+
+  // HU-4 pide que el empleado no vea siquiera la lista del equipo, así que la
+  // pestaña se oculta en vez de deshabilitarse.
+  test("el empleado no ve ni Usuarios ni Auditoría", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+
+    const esperadas = [
+      "Perfil del comercio",
+      "Ubicaciones y moneda",
+      "Mis datos",
+    ];
+    expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
+    expect(screen.queryByTestId("pestana-usuarios")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pestana-auditoria")).not.toBeInTheDocument();
+  });
+
+  // Escribir la sección en la barra de direcciones no puede ser la puerta de
+  // atrás que la pestaña escondida cierra.
+  test("pedir una sección sin permiso por URL cae en Perfil", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar("/configuracion?seccion=auditoria");
+
+    expect(await screen.findByLabelText(/nombre del negocio/i)).toBeInTheDocument();
+    expect(obtenerAuditoria).not.toHaveBeenCalled();
+    expect(screen.getByTestId("pestana-perfil")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  test("el empleado tampoco llega a Usuarios por URL", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar("/configuracion?seccion=usuarios");
+
+    expect(await screen.findByLabelText(/nombre del negocio/i)).toBeInTheDocument();
+    expect(obtenerEquipo).not.toHaveBeenCalled();
+  });
+
+  // Perfil y moneda ya se deshabilitaban bien; lo que cambió es de dónde sale
+  // el booleano. El comportamiento visible tiene que ser el mismo de siempre.
+  test("al empleado los campos del perfil le salen de solo lectura", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+
+    expect(await screen.findByLabelText(/nombre del negocio/i)).toHaveAttribute(
+      "readonly",
+    );
+  });
+
+  test("al propietario no", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
+
+    renderizar();
+
+    expect(
+      await screen.findByLabelText(/nombre del negocio/i),
+    ).not.toHaveAttribute("readonly");
+  });
+
+  // Si averiguar los permisos falla, esconder pestañas le sacaría secciones a
+  // quien sí podía usarlas. Cada sección pide sus datos igual y el backend
+  // corta con un 403 si de verdad no corresponde.
+  test("si no se pudo saber el rol, se muestran todas", async () => {
+    obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
+
+    renderizar();
+
+    expect(await screen.findAllByRole("tab")).toHaveLength(5);
   });
 });

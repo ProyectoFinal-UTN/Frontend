@@ -25,6 +25,9 @@ export default function Pestanas({ items, activa, alCambiar }) {
             role="tab"
             aria-selected={seleccionada}
             onClick={() => alCambiar(item.id)}
+            // Para que el E2E de roles (SCRUM-109) pueda afirmar que una
+            // pestaña NO está, que es lo que verifica el control de acceso.
+            data-testid={`pestana-${item.id}`}
             className={`rounded-(--radius) px-4 py-2 text-sm font-bold transition
                         focus:outline-none focus:ring-4 focus:ring-(--color-primario-suave)
                         ${

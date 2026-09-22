@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import AvisoDeError from "./AvisoDeError";
 import Campo from "./Campo";
 import {
   UNIDADES_MEDIDA,
@@ -264,7 +265,13 @@ function FormularioProducto({ modo, inicial, alGuardar, alCancelar, guardando })
  * operación en curso: sin eso, un doble clic en «Sí, eliminar» manda dos
  * DELETE.
  */
-function FilaProducto({ producto, alEditar, alEliminar, guardando }) {
+function FilaProducto({
+  producto,
+  alEditar,
+  alEliminar,
+  guardando,
+  puedeEditar,
+}) {
   const [confirmando, setConfirmando] = useState(false);
 
   if (confirmando) {
@@ -322,24 +329,35 @@ function FilaProducto({ producto, alEditar, alEliminar, guardando }) {
         >
           Ver stock
         </Link>
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={() => alEditar(producto)}
-          aria-label={`Editar ${producto.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
-        >
-          Editar
-        </button>
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={() => setConfirmando(true)}
-          aria-label={`Eliminar ${producto.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
-        >
-          Eliminar
-        </button>
+        {/*
+          «Ver stock» queda siempre: consultar el catálogo lo puede hacer
+          cualquier rol. Editar y eliminar se ocultan para quien no tiene
+          `producto:create` (HU-32).
+        */}
+        {puedeEditar && (
+          <>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={() => alEditar(producto)}
+              aria-label={`Editar ${producto.nombre}`}
+              data-testid={`producto-editar-${producto.id}`}
+              className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={() => setConfirmando(true)}
+              aria-label={`Eliminar ${producto.nombre}`}
+              data-testid={`producto-eliminar-${producto.id}`}
+              className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
+            >
+              Eliminar
+            </button>
+          </>
+        )}
       </div>
     </li>
   );
@@ -348,6 +366,10 @@ function FilaProducto({ producto, alEditar, alEliminar, guardando }) {
 export default function SeccionProductos({
   productos,
   alRecargar,
+  // Viene como prop y no del hook de permisos a propósito: así este componente
+  // se sigue renderizando en un test sin montar el store, igual que
+  // `SeccionPerfil` y `SeccionUbicaciones` reciben los suyos desde la página.
+  puedeEditar = true,
   codigoInicial = "",
   nombreInicial = "",
   categoriaInicial = "",
@@ -358,8 +380,12 @@ export default function SeccionProductos({
   // arranca abierta con el código ya puesto — y, si el escáner encontró una
   // sugerencia en Open Food Facts, con nombre/categoría también precargados,
   // para no hacer retipear lo que ya se le mostró al usuario.
+  //
+  // Se exige `puedeEditar` también acá: `/productos?nuevo=123` escrito a mano
+  // abriría el formulario de alta para quien no puede crear nada, y lo único
+  // que conseguiría es un 403 al guardar.
   const [formulario, setFormulario] = useState(
-    codigoInicial
+    codigoInicial && puedeEditar
       ? {
           modo: "alta",
           inicial: {
@@ -370,7 +396,9 @@ export default function SeccionProductos({
         }
       : null,
   );
-  const [error, setError] = useState("");
+  // Guarda el fallo entero y no solo su texto: "AvisoDeError" necesita el
+  // status para distinguir un 403 de rol de uno de cuenta (HU-32).
+  const [error, setError] = useState(null);
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -423,7 +451,7 @@ export default function SeccionProductos({
    * @returns `null` si salió bien, o el error con su `status` y su `message`.
    */
   async function ejecutar(operacion) {
-    setError("");
+    setError(null);
     setMensaje("");
     setGuardando(true);
 
@@ -460,7 +488,7 @@ export default function SeccionProductos({
     // ningún lado: se cierra el formulario y se muestra la lista real.
     if (fallo.status === 404) {
       setFormulario(null);
-      setError("Ese producto ya no existe. Actualizamos la lista.");
+      setError(new Error("Ese producto ya no existe. Actualizamos la lista."));
       await alRecargar();
       return null;
     }
@@ -474,7 +502,7 @@ export default function SeccionProductos({
     // estuviera inactivo), así que acá no hay un 404 que manejar.
     const fallo = await ejecutar(() => eliminarProducto(id));
     if (fallo) {
-      setError(fallo.message);
+      setError(fallo);
     }
   }
 
@@ -490,7 +518,7 @@ export default function SeccionProductos({
             umbral que dispara el aviso de reposición.
           </p>
         </div>
-        {!formulario && (
+        {!formulario && puedeEditar && (
           <div className="flex gap-2">
             {/*
               Dos formas de arrancar el alta: escanear (manda a HU-10, que
@@ -499,13 +527,18 @@ export default function SeccionProductos({
               porque son la misma acción con dos puntos de partida distintos,
               no dos cosas separadas.
             */}
-            <Link to="/productos/escanear" className={CLASES_BOTON_PRIMARIO}>
+            <Link
+              to="/productos/escanear"
+              data-testid="productos-escanear"
+              className={CLASES_BOTON_PRIMARIO}
+            >
               Escanear código
             </Link>
             <button
               type="button"
               disabled={guardando}
               onClick={abrirAltaManual}
+              data-testid="productos-nuevo-manual"
               className={CLASES_BOTON_PRIMARIO}
             >
               + Cargar a mano
@@ -524,14 +557,17 @@ export default function SeccionProductos({
         </p>
       )}
 
+      {/*
+        Por `AvisoDeError` y no por un <p> propio: un 403 acá es el caso real de
+        HU-32 —al rol le sacaron el permiso mientras tenía la pantalla abierta—
+        y ese componente es el que sabe mostrarlo sin desloguear y volver a
+        pedir los permisos, para que los botones que ya no corresponden
+        desaparezcan solos.
+      */}
       {error && (
-        <p
-          role="alert"
-          className="mt-4 rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
-                     text-sm font-semibold text-(--color-peligro)"
-        >
-          {error}
-        </p>
+        <div className="mt-4">
+          <AvisoDeError fallo={error} />
+        </div>
       )}
 
       {formulario && (
@@ -558,6 +594,7 @@ export default function SeccionProductos({
               key={producto.id}
               producto={producto}
               guardando={guardando}
+              puedeEditar={puedeEditar}
               alEditar={abrirEdicion}
               alEliminar={eliminar}
             />

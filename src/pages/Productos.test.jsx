@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import Productos from "./Productos";
+import { configuracionDe } from "../tests/permisos";
 
 /**
  * Expone la query actual en el DOM.
@@ -20,9 +21,8 @@ vi.mock("../services/productos", async (original) => ({
   eliminarProducto: vi.fn(),
 }));
 
-// La pantalla la consulta solo para saber si mostrar la entrada a la
-// importación de HU-7. Se mockea para que el test no salga a la red por un
-// dato que es cosmético.
+// De acá salen los permisos del rol (HU-32): qué acciones del catálogo se
+// ofrecen y cuáles no. Se mockea para no salir a la red.
 vi.mock("../services/configuracion", async (original) => ({
   ...(await original()),
   obtenerConfiguracion: vi.fn(),
@@ -56,7 +56,7 @@ function renderizar(rutaInicial = "/productos") {
 beforeEach(() => {
   vi.clearAllMocks();
   obtenerProductos.mockResolvedValue(PRODUCTOS);
-  obtenerConfiguracion.mockResolvedValue({ rol: "propietario" });
+  obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
 });
 
 describe("Carga de la pantalla", () => {
@@ -93,7 +93,7 @@ describe("Entrada a la importación (HU-7)", () => {
   });
 
   test("no se le ofrece al empleado, que terminaría en un 403", async () => {
-    obtenerConfiguracion.mockResolvedValue({ rol: "empleado" });
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
     renderizar();
 
     await screen.findByText("Coca-Cola 500ml");
@@ -234,5 +234,144 @@ describe("Llegar desde el escáner", () => {
 
     expect(await screen.findByText("Coca-Cola 500ml")).toBeInTheDocument();
     expect(screen.queryByLabelText(/código de barras/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Control de acceso por rol (HU-32)", () => {
+  /** Los controles de escritura del catálogo, por su testid. */
+  const ACCIONES = [
+    "productos-importar-csv",
+    "productos-escanear",
+    "productos-nuevo-manual",
+    "producto-editar-p1",
+    "producto-eliminar-p1",
+  ];
+
+  test("el propietario las ve todas", async () => {
+    renderizar();
+
+    await screen.findByText("Coca-Cola 500ml");
+
+    for (const id of ACCIONES) {
+      expect(screen.getByTestId(id)).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByTestId("productos-solo-lectura"),
+    ).not.toBeInTheDocument();
+  });
+
+  test("el gerente también: puede crear productos", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
+
+    renderizar();
+    await screen.findByText("Coca-Cola 500ml");
+
+    for (const id of ACCIONES) {
+      expect(screen.getByTestId(id)).toBeInTheDocument();
+    }
+  });
+
+  // El empleado tiene `producto:["read"]`: la pantalla le sigue sirviendo para
+  // consultar, y desaparece todo lo que terminaría en un 403.
+  test("al empleado no le queda ninguna, pero sí el catálogo", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+    await screen.findByTestId("productos-solo-lectura");
+
+    for (const id of ACCIONES) {
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+    }
+
+    // Lo que sí conserva: la lista y el detalle.
+    expect(screen.getByText("Coca-Cola 500ml")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Ver stock de Coca-Cola 500ml" }),
+    ).toBeInTheDocument();
+  });
+
+  test("el aviso de solo lectura explica por qué falta todo eso", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+
+    expect(await screen.findByTestId("productos-solo-lectura")).toHaveTextContent(
+      "Tu rol puede consultar el catálogo, pero no modificarlo.",
+    );
+  });
+
+  // La puerta de atrás del alta: el escáner manda `?nuevo=<codigo>` y el
+  // formulario se abre solo. Escrito a mano no puede saltear el permiso.
+  test("«?nuevo=» no abre el alta para quien no puede crear", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar("/productos?nuevo=7790895000782");
+
+    await screen.findByTestId("productos-solo-lectura");
+    expect(
+      screen.queryByLabelText(/código de barras/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("Un 403 no cierra la sesión (HU-32)", () => {
+  test("muestra el aviso y deja la pantalla donde estaba", async () => {
+    const fallo = new Error("El rol no tiene permiso para esta accion");
+    fallo.status = 403;
+    fallo.tipo = "permiso";
+    eliminarProducto.mockRejectedValue(fallo);
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await usuario.click(await screen.findByTestId("producto-eliminar-p1"));
+    await usuario.click(screen.getByRole("button", { name: "Sí, eliminar" }));
+
+    // El mensaje del backend, tal cual.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "El rol no tiene permiso para esta accion",
+    );
+
+    // Y lo que importa: sigue parada en Productos. Si la UI desloguease por un
+    // 403, el login funcionaría, la acción volvería a fallar y la persona
+    // quedaría en un loop del que no puede salir.
+    expect(
+      screen.getByRole("heading", { name: "Productos" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("query")).toHaveTextContent("");
+  });
+
+  // El caso completo de la HU: al gerente lo bajan a empleado con la pantalla
+  // abierta. Intenta borrar, ve el aviso, y los botones que ya no le
+  // corresponden desaparecen solos, sin que recargue nada.
+  test("relee los permisos y la UI se pone al día sola", async () => {
+    const fallo = new Error("El rol no tiene permiso para esta accion");
+    fallo.status = 403;
+    fallo.tipo = "permiso";
+    eliminarProducto.mockRejectedValue(fallo);
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await screen.findByText("Coca-Cola 500ml");
+    expect(obtenerConfiguracion).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("producto-editar-p1")).toBeInTheDocument();
+
+    // Mientras tanto, el propietario le cambió el rol.
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    await usuario.click(screen.getByTestId("producto-eliminar-p1"));
+    await usuario.click(screen.getByRole("button", { name: "Sí, eliminar" }));
+
+    // El aviso dispara el refresco: son dos llamadas, no una.
+    await waitFor(() =>
+      expect(obtenerConfiguracion).toHaveBeenCalledTimes(2),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("productos-solo-lectura")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("producto-editar-p1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("productos-importar-csv")).not.toBeInTheDocument();
   });
 });

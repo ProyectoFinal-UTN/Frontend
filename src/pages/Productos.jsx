@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import SeccionProductos from "../components/SeccionProductos";
-import { obtenerConfiguracion } from "../services/configuracion";
+import { usePermisos } from "../hooks/usePermisos";
 import { obtenerProductos } from "../services/productos";
 
 /**
@@ -9,6 +9,10 @@ import { obtenerProductos } from "../services/productos";
  *
  * La pantalla se ocupa de traer la lista y de los tres estados de esa carga;
  * el alta, la edición y la baja viven en `SeccionProductos`.
+ *
+ * Para quien no puede crear productos (hoy el empleado) la pantalla sigue
+ * sirviendo entera como consulta: la lista, el buscador y el detalle funcionan
+ * igual, y lo único que desaparece son las acciones que terminarían en un 403.
  */
 export default function Productos() {
   const [parametros, setParametros] = useSearchParams();
@@ -88,23 +92,16 @@ export default function Productos() {
     cargar();
   }, [cargar]);
 
-  // Solo para saber si mostrar la entrada a la importación (HU-7): un empleado
-  // no puede crear productos, y mandarlo a una pantalla que termina en un 403
-  // después de que eligió el archivo es peor que no ofrecérsela.
+  // Quién puede tocar el catálogo y quién solo consultarlo (HU-32). Antes esta
+  // pantalla pedía la configuración por su cuenta solo para leer el rol; ahora
+  // sale del store compartido, así que no hay una segunda request.
   //
-  // Va en su propio efecto y no encadenada a `cargar`, para que el catálogo no
-  // dependa de esta llamada. Si falla, el link se muestra igual: equivocarse
-  // hacia "mostrar de más" deja al backend rechazando, que es lo correcto;
-  // equivocarse hacia "esconder" le saca una función a quien sí podía usarla.
-  const [rol, setRol] = useState(null);
-
-  useEffect(() => {
-    obtenerConfiguracion()
-      .then((configuracion) => {
-        if (montado.current) setRol(configuracion.rol);
-      })
-      .catch(() => {});
-  }, []);
+  // "Salvo que falle": si la consulta de permisos se cayó, el catálogo se
+  // muestra completo y el backend corta si no corresponde. Esconder las
+  // acciones por una request secundaria caída le sacaría a un propietario la
+  // mitad de la pantalla sin explicarle por qué.
+  const { puedeSalvoQueFalle, resuelto } = usePermisos();
+  const puedeEditar = puedeSalvoQueFalle("producto", "create");
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
@@ -123,9 +120,10 @@ export default function Productos() {
           trabajás.
         </p>
 
-        {rol !== "empleado" && (
+        {puedeEditar && (
           <Link
             to="/productos/importar"
+            data-testid="productos-importar-csv"
             className="mt-4 inline-block rounded-(--radius) border-2
                        border-(--color-borde) bg-(--color-tarjeta) px-4 py-2
                        text-sm font-bold text-(--color-texto) transition
@@ -133,6 +131,24 @@ export default function Productos() {
           >
             Importar desde CSV
           </Link>
+        )}
+
+        {/*
+          Una sola línea para toda la pantalla, en vez de deshabilitar cada
+          botón: con 40 productos serían 80 controles grises repitiendo lo
+          mismo. Así se dice una vez y la lista queda limpia para leer.
+
+          Espera a `resuelto` para no acusar a un propietario de tener solo
+          lectura durante el instante en que los permisos viajan.
+        */}
+        {resuelto && !puedeEditar && (
+          <p
+            data-testid="productos-solo-lectura"
+            className="mt-4 rounded-(--radius) bg-(--color-apagado) px-4 py-3
+                       text-sm text-(--color-texto-apagado)"
+          >
+            Tu rol puede consultar el catálogo, pero no modificarlo.
+          </p>
         )}
       </header>
 
@@ -172,6 +188,7 @@ export default function Productos() {
         <SeccionProductos
           productos={productos}
           alRecargar={cargar}
+          puedeEditar={puedeEditar}
           codigoInicial={codigoInicial}
           nombreInicial={nombreInicial}
           categoriaInicial={categoriaInicial}

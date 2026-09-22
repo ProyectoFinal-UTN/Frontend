@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Campo from "../components/Campo";
 import CampoSelect from "../components/CampoSelect";
+import { usePermisos } from "../hooks/usePermisos";
 import { obtenerProducto } from "../services/productos";
 import {
   SENTIDOS,
@@ -169,6 +170,7 @@ function FilaStock({ fila, productoId, alAjustar }) {
 
 export default function DetalleProducto() {
   const { id } = useParams();
+  const { puedeSalvoQueFalle: puede } = usePermisos();
   const [producto, setProducto] = useState(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -290,16 +292,19 @@ export default function DetalleProducto() {
 
           {/*
             Llega con el producto ya elegido (HU-12). Con una sola ubicación no
-            hay a dónde transferir, así que el link ni aparece.
+            hay a dónde transferir, así que el link ni aparece — y desde HU-32,
+            tampoco para quien no tiene `transferencia:create`.
           */}
-          {producto.stock.porUbicacion.length >= 2 && (
-            <Link
-              to={`/transferencias?productoId=${id}`}
-              className="mt-4 ml-4 inline-block text-sm font-bold text-(--color-primario) underline"
-            >
-              Transferir entre ubicaciones →
-            </Link>
-          )}
+          {producto.stock.porUbicacion.length >= 2 &&
+            puede("transferencia", "create") && (
+              <Link
+                to={`/transferencias?productoId=${id}`}
+                data-testid="detalle-transferir"
+                className="mt-4 ml-4 inline-block text-sm font-bold text-(--color-primario) underline"
+              >
+                Transferir entre ubicaciones →
+              </Link>
+            )}
         </>
       )}
     </main>

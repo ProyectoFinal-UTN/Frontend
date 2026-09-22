@@ -5,11 +5,21 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import DetalleProducto from "./DetalleProducto";
 import { obtenerProducto } from "../services/productos";
 import { registrarMovimiento } from "../services/movimientos";
+import { obtenerConfiguracion } from "../services/configuracion";
+import { configuracionDe } from "../tests/permisos";
 
 vi.mock("../services/productos");
 vi.mock("../services/movimientos", async (original) => ({
   ...(await original()),
   registrarMovimiento: vi.fn(),
+}));
+
+// El link a transferir cuelga de `transferencia:create` (HU-32). Se mockea
+// explícitamente para que el test diga con qué rol corre, en vez de depender de
+// que la request falle sola en jsdom.
+vi.mock("../services/configuracion", async (original) => ({
+  ...(await original()),
+  obtenerConfiguracion: vi.fn(),
 }));
 
 function renderizar(id = "p1") {
@@ -38,6 +48,7 @@ function productoConStock(overrides = {}) {
 describe("DetalleProducto", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
   });
 
   test("muestra 'Cargando datos…' mientras espera la respuesta", () => {
