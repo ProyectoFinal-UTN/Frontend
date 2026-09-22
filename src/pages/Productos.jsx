@@ -152,11 +152,18 @@ export default function Productos() {
         )}
       </header>
 
-      {cargando && (
+      {/*
+        Se espera también a los permisos, no solo al catálogo. `SeccionProductos`
+        decide en su primer render si abre el alta con el código que viene del
+        escáner, y lo hace mirando `puedeEditar`; si se montara antes de saber
+        qué puede el rol, ese código se consumía —se borra del estado y de la
+        URL— sin haber abierto nada, y el escaneo se perdía para siempre.
+      */}
+      {(cargando || !resuelto) && (
         <p className="text-(--color-texto-apagado)">Cargando productos…</p>
       )}
 
-      {!cargando && error && (
+      {!cargando && resuelto && error && (
         <div
           role="alert"
           className="rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
@@ -184,7 +191,7 @@ export default function Productos() {
         </div>
       )}
 
-      {!cargando && !error && productos && (
+      {!cargando && resuelto && !error && productos && (
         <SeccionProductos
           productos={productos}
           alRecargar={cargar}

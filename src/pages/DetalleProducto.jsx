@@ -170,7 +170,10 @@ function FilaStock({ fila, productoId, alAjustar }) {
 
 export default function DetalleProducto() {
   const { id } = useParams();
-  const { puedeSalvoQueFalle: puede } = usePermisos();
+  // `resuelto` acompaña a `puede`: hasta que los permisos llegan, la respuesta
+  // es "todavía no sé", no "no". Sin mirarlo, el link a transferir aparecía un
+  // instante después del resto de la ficha.
+  const { puedeSalvoQueFalle: puede, resuelto } = usePermisos();
   const [producto, setProducto] = useState(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -296,6 +299,7 @@ export default function DetalleProducto() {
             tampoco para quien no tiene `transferencia:create`.
           */}
           {producto.stock.porUbicacion.length >= 2 &&
+            resuelto &&
             puede("transferencia", "create") && (
               <Link
                 to={`/transferencias?productoId=${id}`}

@@ -54,17 +54,24 @@ export default function Configuracion() {
   const {
     puede,
     seSabe,
+    resuelto,
     configuracion,
     refrescar,
     error: errorDePermisos,
   } = usePermisos();
   const [perfil, setPerfil] = useState(null);
   const [errorDelPerfil, setErrorDelPerfil] = useState("");
-  const [cargando, setCargando] = useState(true);
+  const [cargandoPerfil, setCargandoPerfil] = useState(true);
 
   // Las dos cargas son independientes y cualquiera de las dos que falle deja la
   // pantalla sin poder mostrarse: se muestra la primera que haya fallado.
   const error = errorDelPerfil || errorDePermisos?.message || "";
+
+  // Las dos, no solo el perfil. Antes de esto, cuando el perfil ganaba la
+  // carrera contra `GET /api/configuracion` el panel quedaba en blanco: sin
+  // "Cargando…", sin error y sin sección, porque el render de abajo exige
+  // `configuracion` y ya nadie decía que faltaba algo.
+  const cargando = cargandoPerfil || !resuelto;
 
   // Mientras no se sepa qué puede el rol —o si averiguarlo falló— se muestran
   // todas. Esconder por las dudas le sacaría pestañas a quien sí podía usarlas
@@ -114,7 +121,7 @@ export default function Configuracion() {
           if (montado.current) setErrorDelPerfil(fallo.message);
         })
         .finally(() => {
-          if (montado.current) setCargando(false);
+          if (montado.current) setCargandoPerfil(false);
         }),
     [],
   );

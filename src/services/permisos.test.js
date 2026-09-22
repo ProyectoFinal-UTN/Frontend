@@ -134,3 +134,98 @@ describe("olvidarPermisos", () => {
     expect(oyente).toHaveBeenCalled();
   });
 });
+
+// Los cuatro casos de carrera que el contador de generación viene a cerrar.
+// Ninguno lo veía la suite antes: todos necesitan dos respuestas en vuelo a la
+// vez, y con un solo mock que resuelve al toque eso nunca pasa.
+describe("Respuestas que llegan tarde", () => {
+  /** Una promesa que se resuelve cuando uno quiere. */
+  function diferida() {
+    let resolver;
+    let rechazar;
+    const promesa = new Promise((cumplir, fallar) => {
+      resolver = cumplir;
+      rechazar = fallar;
+    });
+    return { promesa, resolver, rechazar };
+  }
+
+  // El bug del logout: la respuesta del rol que se fue aterrizaba después de
+  // `olvidarPermisos()` y volvía a dejar sus permisos puestos.
+  test("una carga en vuelo al cerrar sesión no publica nada", async () => {
+    const primera = diferida();
+    obtenerConfiguracion.mockReturnValue(primera.promesa);
+
+    cargarConfiguracion();
+    olvidarPermisos();
+
+    primera.resolver(configuracionDe("propietario"));
+    await primera.promesa;
+
+    expect(leer().configuracion).toBeNull();
+  });
+
+  test("y la siguiente sesión arranca de cero, sin heredar nada", async () => {
+    const primera = diferida();
+    obtenerConfiguracion.mockReturnValue(primera.promesa);
+
+    cargarConfiguracion();
+    olvidarPermisos();
+    primera.resolver(configuracionDe("propietario"));
+    await primera.promesa;
+
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+    await cargarConfiguracion();
+
+    expect(leer().configuracion.rol).toBe("empleado");
+  });
+
+  // Dos refrescos seguidos: si se aplicaran en orden de llegada, la pantalla
+  // podría quedar mostrando una respuesta más vieja que la última —por ejemplo
+  // sin la ubicación que se acaba de crear—.
+  test("una respuesta vieja no pisa a una más nueva", async () => {
+    const vieja = diferida();
+    const nueva = diferida();
+    obtenerConfiguracion
+      .mockReturnValueOnce(vieja.promesa)
+      .mockReturnValueOnce(nueva.promesa);
+
+    cargarConfiguracion();
+    refrescarPermisos();
+
+    // La nueva contesta primero y la vieja llega después.
+    nueva.resolver(configuracionDe("empleado"));
+    await nueva.promesa;
+    vieja.resolver(configuracionDe("propietario"));
+    await vieja.promesa;
+
+    expect(leer().configuracion.rol).toBe("empleado");
+  });
+
+  // El `catch` anulaba `promesa` sin mirar de quién era: el fallo de una carga
+  // vieja se llevaba puesta la promesa de la nueva, que quedaba en vuelo sin
+  // que nadie la esperara, y el siguiente pedido disparaba una tercera request.
+  test("el fallo de una carga vieja no rompe la que está en vuelo", async () => {
+    const vieja = diferida();
+    const nueva = diferida();
+    obtenerConfiguracion
+      .mockReturnValueOnce(vieja.promesa)
+      .mockReturnValueOnce(nueva.promesa);
+
+    cargarConfiguracion();
+    const enVuelo = refrescarPermisos();
+
+    vieja.rechazar(new Error("se cayó la vieja"));
+    await new Promise((listo) => setTimeout(listo, 0));
+
+    // El fallo viejo no se publica…
+    expect(leer().error).toBeNull();
+
+    nueva.resolver(configuracionDe("gerente"));
+    await enVuelo;
+
+    // …y la nueva llega bien, sin una tercera request de por medio.
+    expect(leer().configuracion.rol).toBe("gerente");
+    expect(obtenerConfiguracion).toHaveBeenCalledTimes(2);
+  });
+});

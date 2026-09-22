@@ -375,3 +375,44 @@ describe("Un 403 no cierra la sesión (HU-32)", () => {
     expect(screen.queryByTestId("productos-importar-csv")).not.toBeInTheDocument();
   });
 });
+
+// Regresión de HU-32 sobre el flujo del escáner (HU-10 → HU-9).
+//
+// `SeccionProductos` decide en su PRIMER render si abre el alta con el código
+// que llega por `?nuevo=`, y desde HU-32 eso depende de `puedeEditar`. Si la
+// sección se montaba antes de que llegaran los permisos, `puedeEditar` era
+// false, el alta no se abría, y el efecto que consume el código igual lo
+// borraba del estado y de la URL: el escaneo se perdía sin dejar rastro.
+describe("El código del escáner sobrevive a la carrera con los permisos", () => {
+  test("abre el alta aunque el catálogo llegue antes que los permisos", async () => {
+    let entregarPermisos;
+    obtenerConfiguracion.mockReturnValue(
+      new Promise((resolver) => {
+        entregarPermisos = resolver;
+      }),
+    );
+
+    renderizar("/productos?nuevo=7791234567890");
+
+    // El catálogo ya está, los permisos todavía no: no se muestra la sección.
+    await waitFor(() => expect(obtenerProductos).toHaveBeenCalled());
+    expect(screen.queryByLabelText(/código de barras/i)).not.toBeInTheDocument();
+
+    entregarPermisos(configuracionDe("propietario"));
+
+    // Y cuando llegan, el alta aparece con el código que trajo el escáner.
+    expect(await screen.findByLabelText(/código de barras/i)).toHaveValue(
+      "7791234567890",
+    );
+  });
+
+  test("al empleado no se le abre, y tampoco se le rompe la pantalla", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar("/productos?nuevo=7791234567890");
+
+    await screen.findByTestId("productos-solo-lectura");
+    expect(screen.queryByLabelText(/código de barras/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Coca-Cola 500ml")).toBeInTheDocument();
+  });
+});

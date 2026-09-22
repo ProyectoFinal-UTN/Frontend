@@ -389,3 +389,62 @@ describe("Control de acceso por rol (HU-32)", () => {
     expect(await screen.findAllByRole("tab")).toHaveLength(5);
   });
 });
+
+describe("La carrera entre el perfil y la configuración", () => {
+  // Regresión: `cargando` pasó a cubrir solo el perfil cuando la configuración
+  // se mudó al store de permisos. Si el perfil contestaba primero, no había ni
+  // "Cargando…", ni error, ni sección: el panel quedaba completamente vacío.
+  test("si el perfil llega primero se sigue avisando que falta algo", async () => {
+    let entregarConfiguracion;
+    obtenerConfiguracion.mockReturnValue(
+      new Promise((resolver) => {
+        entregarConfiguracion = resolver;
+      }),
+    );
+
+    renderizar();
+
+    // El perfil ya resolvió; la configuración no.
+    await waitFor(() => expect(obtenerPerfil).toHaveBeenCalled());
+    expect(screen.getByText("Cargando datos…")).toBeInTheDocument();
+
+    entregarConfiguracion(
+      configuracionDe("propietario", {
+        nombre: "Mi comercio",
+        ubicaciones: [{ id: "u1", nombre: "Depósito" }],
+      }),
+    );
+
+    // Y cuando llega, la sección aparece.
+    expect(
+      await screen.findByLabelText(/nombre del negocio/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Cargando datos…")).not.toBeInTheDocument();
+  });
+
+  test("si la configuración llega primero, tampoco queda en blanco", async () => {
+    let entregarPerfil;
+    obtenerPerfil.mockReturnValue(
+      new Promise((resolver) => {
+        entregarPerfil = resolver;
+      }),
+    );
+
+    renderizar();
+
+    await waitFor(() => expect(obtenerConfiguracion).toHaveBeenCalled());
+    expect(screen.getByText("Cargando datos…")).toBeInTheDocument();
+
+    entregarPerfil({
+      nombre: "Mi comercio",
+      rubro: null,
+      direccion: null,
+      telefono: null,
+      correoContacto: null,
+    });
+
+    expect(
+      await screen.findByLabelText(/nombre del negocio/i),
+    ).toBeInTheDocument();
+  });
+});

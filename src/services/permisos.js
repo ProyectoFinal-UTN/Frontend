@@ -24,6 +24,20 @@ let estado = { configuracion: null, error: null, cargando: false };
 /** La request en vuelo, para que N consumidores no disparen N requests. */
 let promesa = null;
 
+/**
+ * Qué carga es la vigente.
+ *
+ * Sube cada vez que lo cargado deja de valer: un logout o un refresco. Una
+ * respuesta que vuelve con una generación vieja se descarta sin publicar nada.
+ *
+ * Sin esto pasaban dos cosas feas. Al cerrar sesión con una consulta en vuelo,
+ * esa respuesta aterrizaba después y volvía a publicar los permisos del que se
+ * acababa de ir. Y dos refrescos seguidos podían aplicarse al revés, dejando en
+ * pantalla una respuesta más vieja que la última —por ejemplo, sin la ubicación
+ * que se acababa de crear—.
+ */
+let generacion = 0;
+
 const oyentes = new Set();
 
 function publicar(siguiente) {
@@ -40,14 +54,25 @@ function publicar(siguiente) {
 export function cargarConfiguracion() {
   if (promesa) return promesa;
 
+  const mia = generacion;
+
   publicar({ cargando: true, error: null });
 
   promesa = obtenerConfiguracion()
     .then((configuracion) => {
+      // Llegó tarde: entre el pedido y la respuesta hubo un logout o un
+      // refresco, así que esto ya no representa a quien está usando la app.
+      if (mia !== generacion) return null;
+
       publicar({ configuracion, error: null, cargando: false });
       return configuracion;
     })
     .catch((fallo) => {
+      // Un fallo viejo tampoco se publica, y sobre todo no toca `promesa`: la
+      // que está ahí ahora es de una carga más nueva, y anularla dispararía una
+      // tercera request y dejaría a los consumidores esperando de más.
+      if (mia !== generacion) return null;
+
       // La promesa fallada NO se cachea: si quedara, el error se volvería
       // permanente para toda la vida de la pestaña y ningún reintento —ni el
       // botón de la pantalla, ni un refresco tras un 403— podría sacarlo.
@@ -69,6 +94,7 @@ export function cargarConfiguracion() {
  * viaja en esta respuesta, como crear una ubicación.
  */
 export function refrescarPermisos() {
+  generacion += 1;
   promesa = null;
   return cargarConfiguracion();
 }
@@ -82,6 +108,11 @@ export function refrescarPermisos() {
  * caso al siguiente.
  */
 export function olvidarPermisos() {
+  // Primero la generación: lo que ya esté en vuelo tiene que aterrizar sin
+  // publicar nada. Si no, la respuesta del rol que se fue vuelve a entrar un
+  // instante después y deja sus permisos puestos para quien entre ahora —que
+  // es justamente lo que esta función existe para impedir—.
+  generacion += 1;
   promesa = null;
   publicar({ configuracion: null, error: null, cargando: false });
 }
