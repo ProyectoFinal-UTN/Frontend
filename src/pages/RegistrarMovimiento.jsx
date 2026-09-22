@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import Bloqueado from "../components/Bloqueado";
 import Campo from "../components/Campo";
 import CampoSelect from "../components/CampoSelect";
 import { obtenerUbicaciones } from "../services/configuracion";
@@ -82,33 +83,6 @@ function mensajeConfirmacion({ producto, ubicacion, cantidad }) {
   return ubicacion
     ? `Listo. ${sujeto} quedó con ${unidades} en ${ubicacion}.`
     : `Listo. ${sujeto} quedó con ${unidades}.`;
-}
-
-/**
- * Lo que falta configurar antes de poder mover stock, con el link para ir a
- * hacerlo.
- *
- * Sin productos o sin ubicaciones el formulario no puede funcionar, y el
- * backend respondería un 400 recién al confirmar. Más vale decirlo antes y
- * ofrecer la salida que dejar completar algo que se va a rechazar.
- *
- * El link lleva a la pantalla, sin prometer que ahí se pueda crear: un
- * `empleado` solo tiene lectura sobre productos y ubicaciones, así que un
- * «Cargar el primero» lo mandaba a comerse un 403. Mostrarle directamente a
- * quién pedírselo requiere conocer el rol en el front, y eso llega con HU-4.
- */
-function Bloqueado({ mensaje, a, accion }) {
-  return (
-    <div className="rounded-(--radius) bg-(--color-apagado) px-4 py-8 text-center">
-      <p className="font-bold text-(--color-texto)">{mensaje}</p>
-      <Link
-        to={a}
-        className="mt-3 inline-block text-sm font-bold text-(--color-primario) underline"
-      >
-        {accion}
-      </Link>
-    </div>
-  );
 }
 
 function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
