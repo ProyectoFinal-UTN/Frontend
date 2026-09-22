@@ -287,6 +287,19 @@ export default function DetalleProducto() {
           >
             Ver historial de movimientos →
           </Link>
+
+          {/*
+            Llega con el producto ya elegido (HU-12). Con una sola ubicación no
+            hay a dónde transferir, así que el link ni aparece.
+          */}
+          {producto.stock.porUbicacion.length >= 2 && (
+            <Link
+              to={`/transferencias?productoId=${id}`}
+              className="mt-4 ml-4 inline-block text-sm font-bold text-(--color-primario) underline"
+            >
+              Transferir entre ubicaciones →
+            </Link>
+          )}
         </>
       )}
     </main>
