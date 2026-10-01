@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import AvisoDeError from "./AvisoDeError";
 import {
   ROLES,
   cambiarRol,
@@ -13,9 +14,12 @@ import {
 /**
  * Equipo del comercio y sus roles (HU-4).
  *
- * Solo el propietario puede modificar; el gerente ve la lista en modo lectura
- * y el empleado ni siquiera llega acá, porque el backend le responde 403 al
- * pedir los datos.
+ * Cada acción se pregunta por separado (HU-32), porque no son la misma:
+ * `member:read` para ver la lista, `member:update` para cambiar un rol,
+ * `member:delete` para sacar a alguien, `invitation:create` / `invitation:cancel`
+ * para las invitaciones. Hoy eso da el mismo resultado que preguntar si es
+ * propietario —el gerente ve y no toca, el empleado no llega ni a la pestaña—
+ * pero el día que la matriz del backend cambie, esta pantalla acompaña sola.
  */
 
 const CLASES_INPUT =
@@ -57,7 +61,15 @@ function BotonCopiar({ texto }) {
 }
 
 /** Una fila del equipo. */
-function FilaMiembro({ miembro, puedeEditar, esUnoMismo, ocupado, alCambiarRol, alQuitar }) {
+function FilaMiembro({
+  miembro,
+  puedeCambiarRoles,
+  puedeQuitar,
+  esUnoMismo,
+  ocupado,
+  alCambiarRol,
+  alQuitar,
+}) {
   const [confirmando, setConfirmando] = useState(false);
 
   if (confirmando) {
@@ -109,7 +121,7 @@ function FilaMiembro({ miembro, puedeEditar, esUnoMismo, ocupado, alCambiarRol, 
           por error se deja afuera de la administración sin vuelta atrás. El
           backend lo rechaza igual; acá se evita ofrecerlo.
         */}
-        {puedeEditar && !esUnoMismo ? (
+        {puedeCambiarRoles && !esUnoMismo ? (
           <>
             <label htmlFor={`rol-${miembro.id}`} className="sr-only">
               Rol de {miembro.nombre}
@@ -119,6 +131,7 @@ function FilaMiembro({ miembro, puedeEditar, esUnoMismo, ocupado, alCambiarRol, 
               value={miembro.rol}
               disabled={ocupado}
               onChange={(evento) => alCambiarRol(miembro.id, evento.target.value)}
+              data-testid={`usuario-rol-${miembro.id}`}
               className={`${CLASES_INPUT} py-2 text-sm sm:w-auto`}
             >
               {ROLES.map((rol) => (
@@ -127,31 +140,46 @@ function FilaMiembro({ miembro, puedeEditar, esUnoMismo, ocupado, alCambiarRol, 
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={() => setConfirmando(true)}
-              aria-label={`Sacar a ${miembro.nombre}`}
-              className={`${CLASES_BOTON_SUAVE} text-(--color-peligro)`}
-            >
-              Sacar
-            </button>
           </>
         ) : (
           <span className="rounded-(--radius) bg-(--color-apagado) px-3 py-1.5 text-sm font-bold text-(--color-texto-apagado)">
             {etiquetaDeRol(miembro.rol)}
           </span>
         )}
+
+        {/*
+          Separado del select: sacar a alguien es `member:delete` y cambiarle el
+          rol es `member:update`. Hoy los tiene el mismo rol, pero son dos
+          permisos y el backend los chequea por separado.
+        */}
+        {puedeQuitar && !esUnoMismo && (
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => setConfirmando(true)}
+            aria-label={`Sacar a ${miembro.nombre}`}
+            data-testid={`usuario-quitar-${miembro.id}`}
+            className={`${CLASES_BOTON_SUAVE} text-(--color-peligro)`}
+          >
+            Sacar
+          </button>
+        )}
       </div>
     </li>
   );
 }
 
-export default function SeccionUsuarios({ rol, usuarioId }) {
-  const puedeEditar = rol === "propietario";
-
+export default function SeccionUsuarios({
+  usuarioId,
+  puedeInvitar = false,
+  puedeCancelarInvitacion = false,
+  puedeCambiarRoles = false,
+  puedeQuitar = false,
+}) {
   const [datos, setDatos] = useState(null);
-  const [error, setError] = useState("");
+  // El fallo entero, no su texto: `AvisoDeError` mira el status para saber si
+  // es falta de permiso, un problema de cuenta o la sesión vencida.
+  const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
 
@@ -174,10 +202,10 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
         .then((equipo) => {
           if (!montado.current) return;
           setDatos(equipo);
-          setError("");
+          setError(null);
         })
         .catch((fallo) => {
-          if (montado.current) setError(fallo.message);
+          if (montado.current) setError(fallo);
         })
         .finally(() => {
           if (montado.current) setCargando(false);
@@ -191,7 +219,7 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
 
   /** Corre una operación y recarga, mostrando el mensaje del backend si falla. */
   async function ejecutar(operacion) {
-    setError("");
+    setError(null);
     setOcupado(true);
 
     try {
@@ -199,7 +227,7 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
       await cargar();
       return resultado;
     } catch (fallo) {
-      setError(fallo.message);
+      setError(fallo);
       return null;
     } finally {
       setOcupado(false);
@@ -210,7 +238,10 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
     evento.preventDefault();
 
     if (!correo.trim()) {
-      setError("Ingresá el correo de la persona que querés invitar.");
+      // Envuelto en Error para que viaje por el mismo canal que los fallos del
+      // backend. Sin `status`, se clasifica como general y se muestra en rojo,
+      // igual que antes.
+      setError(new Error("Ingresá el correo de la persona que querés invitar."));
       return;
     }
 
@@ -229,15 +260,7 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
   }
 
   if (error && !datos) {
-    return (
-      <p
-        role="alert"
-        className="rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
-                   text-sm font-semibold text-(--color-peligro)"
-      >
-        {error}
-      </p>
-    );
+    return <AvisoDeError fallo={error} />;
   }
 
   return (
@@ -248,14 +271,15 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
           Quiénes trabajan en el comercio y qué puede hacer cada uno.
         </p>
 
+        {/*
+          Un 403 acá es el caso vivo de HU-32: al gerente le sacaron
+          `member:read` con la sección abierta. `AvisoDeError` lo muestra sin
+          desloguearlo y relee los permisos, así la pestaña desaparece sola.
+        */}
         {error && (
-          <p
-            role="alert"
-            className="mt-4 rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
-                       text-sm font-semibold text-(--color-peligro)"
-          >
-            {error}
-          </p>
+          <div className="mt-4">
+            <AvisoDeError fallo={error} />
+          </div>
         )}
 
         <ul className="mt-4 flex flex-col gap-2">
@@ -263,7 +287,8 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
             <FilaMiembro
               key={miembro.id}
               miembro={miembro}
-              puedeEditar={puedeEditar}
+              puedeCambiarRoles={puedeCambiarRoles}
+              puedeQuitar={puedeQuitar}
               esUnoMismo={miembro.userId === usuarioId}
               ocupado={ocupado}
               alCambiarRol={(id, nuevo) => ejecutar(() => cambiarRol(id, nuevo))}
@@ -272,14 +297,17 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
           ))}
         </ul>
 
-        {!puedeEditar && (
-          <p className="mt-4 text-sm text-(--color-texto-apagado)">
+        {!puedeCambiarRoles && !puedeInvitar && (
+          <p
+            data-testid="usuarios-solo-lectura"
+            className="mt-4 text-sm text-(--color-texto-apagado)"
+          >
             Solo el propietario puede cambiar roles o invitar gente.
           </p>
         )}
       </section>
 
-      {puedeEditar && (
+      {puedeInvitar && (
         <section>
           <h2 className="text-xl font-extrabold text-(--color-texto)">
             Invitar a alguien
@@ -324,6 +352,7 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
               <button
                 type="submit"
                 disabled={ocupado}
+                data-testid="usuarios-invitar"
                 className="shrink-0 rounded-(--radius) bg-(--color-primario) px-5 py-3
                            font-bold text-(--color-primario-texto) transition
                            hover:opacity-90 focus:outline-none focus:ring-4
@@ -357,7 +386,7 @@ export default function SeccionUsuarios({ rol, usuarioId }) {
         </section>
       )}
 
-      {puedeEditar && datos.invitaciones.length > 0 && (
+      {puedeCancelarInvitacion && datos.invitaciones.length > 0 && (
         <section>
           <h2 className="text-xl font-extrabold text-(--color-texto)">
             Invitaciones sin usar

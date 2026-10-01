@@ -1,3 +1,5 @@
+import { clasificar } from "./errores";
+
 const BASE_URL = "/api";
 
 /**
@@ -46,6 +48,10 @@ export async function apiFetch(endpoint, options = {}) {
       datos?.error || `No se pudo completar la operación (${response.status})`,
     );
     error.status = response.status;
+    // Qué clase de fallo es, decidido en un solo lugar (HU-32). Acá se
+    // clasifica y nada más: `api.js` no navega ni cierra sesión, porque un
+    // service que conozca React Router rompe la regla de capas del repo.
+    error.tipo = clasificar(error);
     throw error;
   }
 

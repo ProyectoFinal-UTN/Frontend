@@ -364,3 +364,70 @@ describe("Paginación", () => {
     expect(screen.queryByRole("navigation", { name: "Paginación" })).toBeNull();
   });
 });
+
+describe("Cuando el backend recorta los correos (HU-32)", () => {
+  // Al empleado, `usuario.correo` no le llega: la clave directamente no está en
+  // la respuesta, no viene vacía (ver `listarMovimientos` en el Backend). El
+  // historial no puede ser la puerta de atrás para juntar los correos del
+  // equipo que `GET /api/miembros` le niega.
+  //
+  // El fixture por defecto siempre trae correo, así que sin este caso el
+  // recorte nunca se ejercita y la regresión pasaría desapercibida.
+  test("un movimiento sin correo muestra el nombre igual", async () => {
+    obtenerHistorial.mockResolvedValue(
+      respuesta([movimiento({ usuario: { id: "us1", nombre: "Ana" } })]),
+    );
+
+    renderizar();
+
+    const item = await screen.findByRole("listitem");
+
+    // El nombre siempre viene, así que la fila sigue diciendo quién hizo qué.
+    expect(within(item).getByText("Registró")).toBeInTheDocument();
+    expect(within(item).getByText("Ana")).toBeInTheDocument();
+
+    // Y no se filtra ningún correo: ni el de esta fila ni un "undefined" o un
+    // hueco donde antes iba.
+    expect(within(item).queryByText(/@/)).not.toBeInTheDocument();
+    expect(within(item).queryByText(/undefined/)).not.toBeInTheDocument();
+  });
+
+  test("el resto de la fila no cambia por venir sin correo", async () => {
+    obtenerHistorial.mockResolvedValue(
+      respuesta([
+        movimiento({
+          tipo: "merma",
+          cantidad: -2,
+          motivo: "Se venció",
+          usuario: { id: "us1", nombre: "Ana" },
+        }),
+      ]),
+    );
+
+    renderizar();
+
+    const item = await screen.findByRole("listitem");
+    expect(within(item).getByText("Yerba 1kg")).toBeInTheDocument();
+    expect(within(item).getByText(/^Merma/)).toBeInTheDocument();
+    expect(within(item).getByText("−2")).toBeInTheDocument();
+    expect(within(item).getByText("Local")).toBeInTheDocument();
+    expect(within(item).getByText("Ana")).toBeInTheDocument();
+    expect(within(item).getByText("7790001112223")).toBeInTheDocument();
+    expect(within(item).getByText("Se venció")).toBeInTheDocument();
+  });
+
+  // El gerente sí tiene `member:read`, así que a él el correo le sigue
+  // llegando: el recorte es solo del empleado.
+  test("cuando el correo sí viene, la fila lo sigue pudiendo usar", async () => {
+    obtenerHistorial.mockResolvedValue(
+      respuesta([
+        movimiento({ usuario: { id: "us1", nombre: "", correo: "ana@test.local" } }),
+      ]),
+    );
+
+    renderizar();
+
+    const item = await screen.findByRole("listitem");
+    expect(within(item).getByText("ana@test.local")).toBeInTheDocument();
+  });
+});

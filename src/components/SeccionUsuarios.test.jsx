@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SeccionUsuarios from "./SeccionUsuarios";
+import { PERMISOS } from "../tests/permisos";
 
 vi.mock("../services/miembros", async (original) => ({
   ...(await original()),
@@ -41,9 +42,30 @@ const EQUIPO = {
   roles: [],
 };
 
+/**
+ * Las props de permiso que Configuracion.jsx le pasaría a este componente para
+ * ese rol, derivadas de los permisos reales del backend (HU-32).
+ *
+ * Se deriva en vez de escribirlas a mano para que el test no pueda afirmar una
+ * combinación que el backend nunca manda —un gerente que invita, por ejemplo—.
+ */
+function permisosDelRol(rol) {
+  const puede = (recurso, accion) =>
+    PERMISOS[rol]?.[recurso]?.includes(accion) === true;
+
+  return {
+    puedeInvitar: puede("invitation", "create"),
+    puedeCancelarInvitacion: puede("invitation", "cancel"),
+    puedeCambiarRoles: puede("member", "update"),
+    puedeQuitar: puede("member", "delete"),
+  };
+}
+
 function renderizar({ rol = "propietario", usuarioId = "u1", equipo } = {}) {
   obtenerEquipo.mockResolvedValue(equipo ?? EQUIPO);
-  return render(<SeccionUsuarios rol={rol} usuarioId={usuarioId} />);
+  return render(
+    <SeccionUsuarios usuarioId={usuarioId} {...permisosDelRol(rol)} />,
+  );
 }
 
 beforeEach(() => {
@@ -205,13 +227,18 @@ describe("Como gerente", () => {
 });
 
 describe("Cuando el backend rechaza la lectura", () => {
-  test("muestra el error, que es lo que le pasa a un empleado", async () => {
+  // Desde HU-32 al empleado ni le aparece la pestaña, así que este camino
+  // quedó para el caso que sigue siendo real: que le saquen `member:read` a
+  // alguien que ya tenía la sección abierta.
+  test("muestra el error en vez de romperse", async () => {
     obtenerEquipo.mockRejectedValue(
-      new Error("El rol no tiene acceso a este recurso"),
+      new Error("El rol no tiene permiso para esta accion"),
     );
 
-    render(<SeccionUsuarios rol="empleado" usuarioId="u3" />);
+    render(<SeccionUsuarios usuarioId="u3" {...permisosDelRol("empleado")} />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/no tiene acceso/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /no tiene permiso/i,
+    );
   });
 });

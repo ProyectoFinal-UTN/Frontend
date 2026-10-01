@@ -7,7 +7,7 @@ import SeccionPerfil from "../components/SeccionPerfil";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
 import SeccionUsuarios from "../components/SeccionUsuarios";
 import { useAuth } from "../hooks/useAuth";
-import { obtenerConfiguracion } from "../services/configuracion";
+import { usePermisos } from "../hooks/usePermisos";
 import { obtenerPerfil } from "../services/comercio";
 
 /**
@@ -20,13 +20,29 @@ import { obtenerPerfil } from "../services/comercio";
  * separada de las otras a propósito: las cuatro primeras son del comercio y
  * dependen del rol, y esa es de la persona —los mismos derechos para todos,
  * incluido el empleado—.
+ *
+ * Las pestañas que el rol no puede usar no se muestran (HU-32). Se ocultan y no
+ * se deshabilitan: una pestaña gris le anuncia al empleado que existe una
+ * sección con la lista del equipo, y HU-4 pide exactamente lo contrario —que ni
+ * siquiera sepa que puede mirarse—.
  */
 
+/**
+ * `requiere` es el permiso que hace falta para ver la pestaña; sin él, la ve
+ * cualquiera con sesión. Perfil y Ubicaciones se muestran siempre porque los
+ * tres roles pueden al menos leerlas, aunque no todos puedan editarlas.
+ */
 const SECCIONES = [
   { id: "perfil", etiqueta: "Perfil del comercio" },
   { id: "ubicaciones", etiqueta: "Ubicaciones y moneda" },
-  { id: "usuarios", etiqueta: "Usuarios y roles" },
-  { id: "auditoria", etiqueta: "Auditoría" },
+  {
+    id: "usuarios",
+    etiqueta: "Usuarios y roles",
+    // `member:read` y no "es propietario": el gerente también la ve, en modo
+    // lectura, porque necesita saber quién registró cada movimiento.
+    requiere: ["member", "read"],
+  },
+  { id: "auditoria", etiqueta: "Auditoría", requiere: ["auditoria", "read"] },
   { id: "mis-datos", etiqueta: "Mis datos" },
 ];
 
@@ -35,15 +51,43 @@ const SECCION_POR_DEFECTO = "perfil";
 export default function Configuracion() {
   const [parametros, setParametros] = useSearchParams();
   const { usuario } = useAuth();
-  const [configuracion, setConfiguracion] = useState(null);
+  const {
+    puede,
+    seSabe,
+    resuelto,
+    configuracion,
+    refrescar,
+    error: errorDePermisos,
+  } = usePermisos();
   const [perfil, setPerfil] = useState(null);
-  const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(true);
+  const [errorDelPerfil, setErrorDelPerfil] = useState("");
+  const [cargandoPerfil, setCargandoPerfil] = useState(true);
+
+  // Las dos cargas son independientes y cualquiera de las dos que falle deja la
+  // pantalla sin poder mostrarse: se muestra la primera que haya fallado.
+  const error = errorDelPerfil || errorDePermisos?.message || "";
+
+  // Las dos, no solo el perfil. Antes de esto, cuando el perfil ganaba la
+  // carrera contra `GET /api/configuracion` el panel quedaba en blanco: sin
+  // "Cargando…", sin error y sin sección, porque el render de abajo exige
+  // `configuracion` y ya nadie decía que faltaba algo.
+  const cargando = cargandoPerfil || !resuelto;
+
+  // Mientras no se sepa qué puede el rol —o si averiguarlo falló— se muestran
+  // todas. Esconder por las dudas le sacaría pestañas a quien sí podía usarlas
+  // por una request caída; de todos modos cada sección pide sus datos y el
+  // backend responde 403 si de verdad no corresponde.
+  const visibles = seSabe
+    ? SECCIONES.filter(({ requiere }) => !requiere || puede(...requiere))
+    : SECCIONES;
 
   // La pestaña vive en la URL, no en estado local: así el link se puede
   // compartir y sobrevive a un refresh.
+  //
+  // Se resuelve contra las pestañas VISIBLES, así que un `?seccion=auditoria`
+  // escrito a mano por quien no puede leerla cae en Perfil.
   const pedida = parametros.get("seccion");
-  const activa = SECCIONES.some((s) => s.id === pedida)
+  const activa = visibles.some((s) => s.id === pedida)
     ? pedida
     : SECCION_POR_DEFECTO;
 
@@ -61,30 +105,42 @@ export default function Configuracion() {
 
   // Devuelve la promesa en vez de usar async/await para que quede explícito
   // que ningún `setState` ocurre de forma síncrona dentro del efecto.
-  // Las dos cargas van en paralelo: el perfil y la configuración son
-  // endpoints distintos, y esperarlos en serie duplicaría la espera sin
-  // ninguna razón.
-  const cargar = useCallback(
+  //
+  // Solo el perfil: la configuración del comercio la trae el store de permisos,
+  // que ya la pidió una vez para toda la app. Antes esta pantalla la pedía por
+  // su cuenta y era una de las tres requests duplicadas al mismo endpoint.
+  const cargarPerfil = useCallback(
     () =>
-      Promise.all([obtenerConfiguracion(), obtenerPerfil()])
-        .then(([datosConfiguracion, datosPerfil]) => {
+      obtenerPerfil()
+        .then((datosPerfil) => {
           if (!montado.current) return;
-          setConfiguracion(datosConfiguracion);
           setPerfil(datosPerfil);
-          setError("");
+          setErrorDelPerfil("");
         })
         .catch((fallo) => {
-          if (montado.current) setError(fallo.message);
+          if (montado.current) setErrorDelPerfil(fallo.message);
         })
         .finally(() => {
-          if (montado.current) setCargando(false);
+          if (montado.current) setCargandoPerfil(false);
         }),
     [],
   );
 
   useEffect(() => {
-    cargar();
-  }, [cargar]);
+    cargarPerfil();
+  }, [cargarPerfil]);
+
+  /**
+   * Lo que llaman las secciones hijas después de guardar algo.
+   *
+   * Las dos van en paralelo: son endpoints distintos y esperarlos en serie
+   * duplicaría la espera. Se refresca también la configuración porque las
+   * ubicaciones viajan en esa respuesta: crear una tiene que verse acá.
+   */
+  const cargar = useCallback(
+    () => Promise.all([refrescar(), cargarPerfil()]),
+    [refrescar, cargarPerfil],
+  );
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
@@ -105,7 +161,7 @@ export default function Configuracion() {
       </header>
 
       <Pestanas
-        items={SECCIONES}
+        items={visibles}
         activa={activa}
         alCambiar={(id) => setParametros({ seccion: id })}
       />
@@ -148,37 +204,39 @@ export default function Configuracion() {
               <SeccionPerfil
                 perfil={perfil}
                 alGuardar={cargar}
-                puedeEditar={configuracion.rol === "propietario"}
+                puedeEditar={puede("comercio", "update")}
               />
             )}
 
             {activa === "ubicaciones" && (
               // Las ubicaciones las administra también el gerente, porque son
               // parte de operar el negocio. La moneda no: eso es del
-              // propietario. Los permisos reales están en el backend; acá solo
-              // se evita ofrecer lo que va a terminar en un 403.
+              // propietario, y por eso cuelga de `comercio:update`. Los
+              // permisos reales están en el backend; acá solo se evita ofrecer
+              // lo que va a terminar en un 403.
               <SeccionUbicaciones
                 configuracion={configuracion}
                 alRecargar={cargar}
-                puedeEditarUbicaciones={configuracion.rol !== "empleado"}
-                puedeEditarMoneda={configuracion.rol === "propietario"}
+                puedeEditarUbicaciones={puede("ubicacion", "create")}
+                puedeEditarMoneda={puede("comercio", "update")}
               />
             )}
 
             {activa === "usuarios" && (
-              // El rol viene del backend, no del cliente: es lo que decide qué
-              // controles se muestran. Igual cada endpoint valida por su
-              // cuenta, así que esconderlos es UX y no seguridad.
+              // Una prop por acción en vez de un "puedeEditar" global: el
+              // gerente llega hasta acá con `member:read` y tiene que ver la
+              // lista sin poder tocarla. Preguntando por acción eso sale solo,
+              // sin nombrar ningún rol.
               <SeccionUsuarios
-                rol={configuracion.rol}
                 usuarioId={usuario?.id}
+                puedeInvitar={puede("invitation", "create")}
+                puedeCancelarInvitacion={puede("invitation", "cancel")}
+                puedeCambiarRoles={puede("member", "update")}
+                puedeQuitar={puede("member", "delete")}
               />
             )}
 
-            {/*
-              La auditoría no recibe el rol: solo la puede leer el propietario y
-              eso lo decide el backend. Si otro rol entra, se muestra su 403.
-            */}
+            {/* La pestaña ya no existe para quien no tiene `auditoria:read`. */}
             {activa === "auditoria" && <SeccionAuditoria />}
           </>
         )}

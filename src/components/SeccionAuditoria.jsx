@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import AvisoDeError from "./AvisoDeError";
 import {
   describirEvento,
   etiquetaDeAccion,
@@ -9,9 +10,11 @@ import {
 /**
  * Registro de accesos y acciones (HU-5).
  *
- * Solo lo ve el propietario. Si otro rol llega acá, el backend responde 403 y
- * se muestra ese mensaje: no hace falta esconder nada, porque la pestaña ya no
- * tiene sentido para quien no puede leerla.
+ * Solo lo ve quien tiene `auditoria:read`, que hoy es el propietario. Desde
+ * HU-32 la pestaña ni siquiera aparece para los demás, así que llegar acá sin
+ * permiso dejó de ser un camino normal. El manejo del 403 se conserva igual
+ * para el caso que sigue existiendo: que le saquen el permiso a alguien
+ * mientras tiene la pantalla abierta.
  */
 
 const CLASES_SELECT =
@@ -32,7 +35,9 @@ function formatearFecha(iso) {
 
 export default function SeccionAuditoria() {
   const [datos, setDatos] = useState(null);
-  const [error, setError] = useState("");
+  // El fallo entero, no su texto: `AvisoDeError` mira el status para saber si
+  // es falta de permiso, un problema de cuenta o la sesión vencida.
+  const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [filtros, setFiltros] = useState({ accion: "", recurso: "" });
 
@@ -51,10 +56,10 @@ export default function SeccionAuditoria() {
         .then((respuesta) => {
           if (!montado.current) return;
           setDatos(respuesta);
-          setError("");
+          setError(null);
         })
         .catch((fallo) => {
-          if (montado.current) setError(fallo.message);
+          if (montado.current) setError(fallo);
         })
         .finally(() => {
           if (montado.current) setCargando(false);
@@ -71,15 +76,9 @@ export default function SeccionAuditoria() {
   }
 
   if (error) {
-    return (
-      <p
-        role="alert"
-        className="rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
-                   text-sm font-semibold text-(--color-peligro)"
-      >
-        {error}
-      </p>
-    );
+    // Si el 403 es porque le sacaron `auditoria:read` recién, `AvisoDeError`
+    // relee los permisos y la pestaña desaparece sola en el próximo render.
+    return <AvisoDeError fallo={error} />;
   }
 
   const { eventos, filtros: opciones } = datos;

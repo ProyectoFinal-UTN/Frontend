@@ -337,23 +337,7 @@ describe("respuesta del backend", () => {
   });
 });
 
-describe("permisos", () => {
-  test("al empleado se le explica en vez de dejarlo chocar con un 403", async () => {
-    obtenerConfiguracion.mockResolvedValue({ rol: "empleado" });
-    renderizar();
-
-    expect(
-      await screen.findByText("Tu rol no puede importar productos"),
-    ).toBeInTheDocument();
-    expect(screen.queryByLabelText("Archivo CSV")).not.toBeInTheDocument();
-  });
-
-  test("si no se puede saber el rol, la pantalla se muestra igual", async () => {
-    // El backend sigue siendo el que corta. Bloquear a alguien que sí podía
-    // importar porque una request secundaria falló sería peor.
-    obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
-    renderizar();
-
-    expect(await screen.findByLabelText("Archivo CSV")).toBeInTheDocument();
-  });
-});
+// Quién puede entrar acá dejó de decidirlo esta pantalla: desde HU-32 lo
+// resuelve la guarda de la ruta en `App.jsx` con `producto:create`, y el caso
+// del empleado se verifica en `RutaProtegida.test.jsx`. Este archivo se queda
+// con lo suyo, que es la importación en sí.

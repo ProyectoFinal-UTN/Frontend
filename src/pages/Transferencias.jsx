@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import Bloqueado from "../components/Bloqueado";
 import Campo from "../components/Campo";
 import CampoSelect from "../components/CampoSelect";
 import { obtenerUbicaciones } from "../services/configuracion";
+import { clasificar, mensajeDe } from "../services/errores";
 import { MOTIVO_MAXIMO } from "../services/movimientos";
 import { obtenerProducto, obtenerProductos } from "../services/productos";
 import { transferirStock } from "../services/transferencias";
@@ -85,28 +87,6 @@ function mensajeConfirmacion({
 /** Un saldo de la respuesta si es un número, o `null`. */
 function saldo(fila) {
   return typeof fila?.cantidad === "number" ? fila.cantidad : null;
-}
-
-/**
- * Lo que falta configurar antes de poder transferir, con el link para ir a
- * hacerlo. Copia local del `Bloqueado` de `RegistrarMovimiento`, que no se
- * exporta: exportarlo era tocar el archivo de HU-13.
- *
- * El link lleva a la pantalla sin prometer que ahí se pueda crear: un
- * `empleado` solo tiene lectura sobre productos y ubicaciones.
- */
-function Bloqueado({ mensaje, a, accion, testId }) {
-  return (
-    <div
-      data-testid={testId}
-      className="rounded-(--radius) bg-(--color-apagado) px-4 py-8 text-center"
-    >
-      <p className="font-bold text-(--color-texto)">{mensaje}</p>
-      <Link to={a} className={`mt-3 inline-block text-sm ${CLASES_LINK}`}>
-        {accion}
-      </Link>
-    </div>
-  );
 }
 
 function FormularioTransferencia({
@@ -324,17 +304,11 @@ function FormularioTransferencia({
       return;
     }
 
-    if (fallo.status === 401) {
-      setErrorGeneral({ tipo: "sesion", mensaje: fallo.message });
-      return;
-    }
-
-    if (fallo.status === 403) {
-      setErrorGeneral({ tipo: "permiso", mensaje: fallo.message });
-      return;
-    }
-
-    setErrorGeneral({ tipo: "general", mensaje: fallo.message });
+    // El 401 y los tres 403 los distingue `clasificar` (HU-32), que es el único
+    // lugar del repo que conoce los mensajes del backend. Acá solo se decide
+    // qué salida ofrecer, que es lo propio de esta pantalla.
+    const tipo = clasificar(fallo);
+    setErrorGeneral({ tipo, mensaje: mensajeDe(tipo, fallo.message) });
   }
 
   async function alEnviar(evento) {

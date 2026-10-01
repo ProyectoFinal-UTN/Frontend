@@ -53,10 +53,16 @@ export default function App() {
             </RutaProtegida>
           }
         />
+        {/*
+          Escanear exige `producto:create` y no `read`: el endpoint que consulta
+          el código (`GET /api/productos/codigo/:codigoBarras`) existe para dar
+          de alta lo que se escanea, así que el backend lo cierra con create. No
+          hay variante de solo lectura que ofrecerle al empleado.
+        */}
         <Route
           path="/productos/escanear"
           element={
-            <RutaProtegida>
+            <RutaProtegida permiso={{ producto: ["create"] }}>
               <EscanearProducto />
             </RutaProtegida>
           }
@@ -69,7 +75,10 @@ export default function App() {
         <Route
           path="/productos/importar"
           element={
-            <RutaProtegida>
+            <RutaProtegida
+              permiso={{ producto: ["create"] }}
+              mensajeSinPermiso="Tu rol no puede importar productos. Pedile a quien administra el comercio —el propietario o el gerente— que suba la planilla."
+            >
               <ImportarProductos />
             </RutaProtegida>
           }
@@ -85,15 +94,22 @@ export default function App() {
         <Route
           path="/movimientos/nuevo"
           element={
-            <RutaProtegida>
+            <RutaProtegida permiso={{ movimiento: ["create"] }}>
               <RegistrarMovimiento />
             </RutaProtegida>
           }
         />
+        {/*
+          `transferencia:create` y no `movimiento:create`: el backend los separó
+          a propósito (HU-32), porque mover mercadería entre locales es una
+          decisión distinta de registrar una venta. Hoy los tres roles tienen
+          los dos, así que no cambia nada visible; el día que se restrinja uno
+          solo, esta guarda ya apunta al correcto.
+        */}
         <Route
           path="/transferencias"
           element={
-            <RutaProtegida>
+            <RutaProtegida permiso={{ transferencia: ["create"] }}>
               <Transferencias />
             </RutaProtegida>
           }
