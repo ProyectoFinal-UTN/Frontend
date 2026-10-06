@@ -29,6 +29,10 @@
   --color-primario-texto: oklch(99% 0.005 90);
   --color-primario-suave: oklch(93% 0.03 250);
 
+  /* Acento: el naranja del prototipo, para el asistente. */
+  --color-acento: oklch(68% 0.17 50);
+  --color-acento-texto: oklch(99% 0.005 90);
+
   /* Estados */
   --color-exito: oklch(58% 0.13 152);
   --color-exito-suave: oklch(93% 0.05 152);
@@ -39,9 +43,17 @@
   --color-peligro-suave: oklch(94% 0.04 25);
 }
 
-/* El prototipo trae tema oscuro; se respeta la preferencia del sistema. */
+/*
+ * El prototipo trae tema oscuro; se respeta la preferencia del sistema.
+ *
+ * Se pisan las VARIABLES en `:root`, no el `@theme`. Tailwind v4 no admite
+ * `@theme` adentro de un `@media`: lo aplanaba, los valores oscuros pisaban a
+ * los claros, y la app quedaba oscura para todo el mundo sin importar la
+ * preferencia. Las utilidades usan `var(--color-…)`, así que alcanza con
+ * cambiar la variable.
+ */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-fondo: oklch(22% 0.02 70);
     --color-texto: oklch(97% 0.01 84);
     --color-tarjeta: oklch(27% 0.02 70);
@@ -52,6 +64,9 @@
     --color-primario: oklch(62% 0.13 250);
     --color-primario-texto: oklch(99% 0.005 90);
     --color-primario-suave: oklch(35% 0.06 250);
+
+    --color-acento: oklch(72% 0.16 50);
+    --color-acento-texto: oklch(20% 0.02 60);
 
     --color-exito: oklch(65% 0.13 152);
     --color-exito-suave: oklch(33% 0.06 152);

@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { Sparkles, X } from "lucide-react";
 import AvisoDeError from "./AvisoDeError";
 import { useAuth } from "../hooks/useAuth";
 import { usePermisos } from "../hooks/usePermisos";
 import {
+  EVENTO_ABRIR_ASISTENTE,
   MODO,
   PREGUNTA_MAXIMA,
   consultarAsistente,
@@ -93,6 +95,13 @@ function PanelDelAsistente() {
     };
   }, []);
 
+  // Cualquier pantalla lo puede abrir sin conocerlo (el banner de Inicio).
+  useEffect(() => {
+    const abrir = () => setAbierto(true);
+    window.addEventListener(EVENTO_ABRIR_ASISTENTE, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_ASISTENTE, abrir);
+  }, []);
+
   // Al abrir, directo a escribir: es lo único que se hace en el panel.
   useEffect(() => {
     if (abierto) campoRef.current?.focus();
@@ -181,7 +190,9 @@ function PanelDelAsistente() {
   const sinTexto = texto.trim() === "";
 
   return (
-    <div className="fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3">
+    // `bottom-24` en celular: la barra de navegación está fija abajo y lo
+    // taparía. En escritorio la navegación es la sidebar y el botón baja.
+    <div className="fixed right-4 bottom-24 z-40 flex flex-col items-end gap-3 lg:bottom-4">
       {abierto && (
         <section
           id={idPanel}
@@ -288,12 +299,23 @@ function PanelDelAsistente() {
         onClick={() => (abierto ? cerrar() : setAbierto(true))}
         aria-expanded={abierto}
         aria-controls={abierto ? idPanel : undefined}
-        className="rounded-full bg-(--color-primario) px-5 py-3 font-bold
-                   text-(--color-primario-texto) shadow-lg transition
-                   hover:opacity-90 focus:outline-none focus:ring-4
+        // Un círculo con ícono y no una pastilla con texto: ocupa menos, y
+        // `Layout` le reserva una franja a la derecha del contenido para que
+        // nunca quede arriba de un botón de la pantalla (lo tapaba: el
+        // «Siguiente →» del historial no se podía tocar). El nombre accesible
+        // sigue siendo exactamente "Asistente", que es como lo buscan los E2E.
+        aria-label="Asistente"
+        title="Asistente"
+        className="grid size-14 place-items-center rounded-full
+                   bg-(--color-acento) text-(--color-acento-texto) shadow-lg
+                   transition hover:opacity-90 focus:outline-none focus:ring-4
                    focus:ring-(--color-primario-suave)"
       >
-        Asistente
+        {abierto ? (
+          <X aria-hidden="true" className="size-6" />
+        ) : (
+          <Sparkles aria-hidden="true" className="size-6" />
+        )}
       </button>
     </div>
   );
