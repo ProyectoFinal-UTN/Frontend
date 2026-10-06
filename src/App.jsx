@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import Asistente from "./components/Asistente";
 import RutaProtegida from "./components/RutaProtegida";
 import Configuracion from "./pages/Configuracion";
 import DetalleProducto from "./pages/DetalleProducto";
@@ -124,6 +125,13 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/*
+        Fuera de <Routes> a propósito (HU-26): así hay un solo asistente para
+        todas las pantallas, y no se desmonta al navegar, con lo que la
+        conversación sobrevive al cambiar de pantalla. Se muestra solo con
+        sesión iniciada; eso lo decide el propio componente.
+      */}
+      <Asistente />
     </BrowserRouter>
   );
 }

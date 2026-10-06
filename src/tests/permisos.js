@@ -26,6 +26,7 @@ export const PERMISOS = Object.freeze({
     alerta: ["read", "update"],
     auditoria: ["read"],
     cuenta: ["read", "delete"],
+    asistente: ["consultar"],
   },
 
   // Opera el negocio completo pero no lo administra: ve el equipo en lectura,
@@ -41,6 +42,7 @@ export const PERMISOS = Object.freeze({
     transferencia: ["create"],
     alerta: ["read", "update"],
     cuenta: ["read", "delete"],
+    asistente: ["consultar"],
   },
 
   // Registra movimientos y consulta. Ni `member`, ni `invitation`, ni
@@ -55,6 +57,7 @@ export const PERMISOS = Object.freeze({
     transferencia: ["create"],
     alerta: ["read"],
     cuenta: ["read", "delete"],
+    asistente: ["consultar"],
   },
 });
 
