@@ -28,6 +28,17 @@ export const PREGUNTA_MAXIMA = 500;
 export const MODO = Object.freeze({ IA: "ia", LIMITADO: "limitado" });
 
 /**
+ * Evento de `window` que abre el panel del asistente desde cualquier lado
+ * (el banner de Inicio, por ejemplo).
+ *
+ * Un evento y no un estado compartido: el asistente está montado una sola vez
+ * en `App`, fuera de las rutas, y quien lo quiere abrir no tiene por qué
+ * conocerlo. Si el asistente no está montado —sin sesión, o un rol sin
+ * permiso—, el evento simplemente no lo escucha nadie.
+ */
+export const EVENTO_ABRIR_ASISTENTE = "asistente:abrir";
+
+/**
  * Le hace una pregunta al asistente.
  *
  * Devuelve `{ respuesta, modo, herramientasUsadas }`. Cada llamada puede

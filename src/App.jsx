@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Asistente from "./components/Asistente";
+import Layout from "./components/Layout";
 import RutaProtegida from "./components/RutaProtegida";
 import Configuracion from "./pages/Configuracion";
 import DetalleProducto from "./pages/DetalleProducto";
@@ -30,99 +31,107 @@ export default function App() {
         <Route path="/restablecer" element={<Restablecer />} />
         {/* Sin RutaProtegida: quien recibe el link puede no tener cuenta. */}
         <Route path="/invitacion/:id" element={<Invitacion />} />
-        <Route
-          path="/"
-          element={
-            <RutaProtegida>
-              <Inicio />
-            </RutaProtegida>
-          }
-        />
-        <Route
-          path="/configuracion"
-          element={
-            <RutaProtegida>
-              <Configuracion />
-            </RutaProtegida>
-          }
-        />
-        <Route
-          path="/productos"
-          element={
-            <RutaProtegida>
-              <Productos />
-            </RutaProtegida>
-          }
-        />
         {/*
-          Escanear exige `producto:create` y no `read`: el endpoint que consulta
-          el código (`GET /api/productos/codigo/:codigoBarras`) existe para dar
-          de alta lo que se escanea, así que el backend lo cierra con create. No
-          hay variante de solo lectura que ofrecerle al empleado.
+          Las pantallas con sesión cuelgan de `Layout`, que les pone la
+          navegación (sidebar en escritorio, barra abajo en celular). Las
+          públicas de arriba —registro, login, recuperación, invitación— no la
+          llevan: quien las usa no tiene sesión.
         */}
-        <Route
-          path="/productos/escanear"
-          element={
-            <RutaProtegida permiso={{ producto: ["create"] }}>
-              <EscanearProducto />
-            </RutaProtegida>
-          }
-        />
-        {/*
-          Va antes que `/productos/:id` en el archivo por prolijidad, pero no
-          depende de eso: React Router rankea por especificidad, así que un
-          segmento fijo como "importar" siempre le gana al `:id`.
-        */}
-        <Route
-          path="/productos/importar"
-          element={
-            <RutaProtegida
-              permiso={{ producto: ["create"] }}
-              mensajeSinPermiso="Tu rol no puede importar productos. Pedile a quien administra el comercio —el propietario o el gerente— que suba la planilla."
-            >
-              <ImportarProductos />
-            </RutaProtegida>
-          }
-        />
-        <Route
-          path="/movimientos"
-          element={
-            <RutaProtegida>
-              <HistorialMovimientos />
-            </RutaProtegida>
-          }
-        />
-        <Route
-          path="/movimientos/nuevo"
-          element={
-            <RutaProtegida permiso={{ movimiento: ["create"] }}>
-              <RegistrarMovimiento />
-            </RutaProtegida>
-          }
-        />
-        {/*
-          `transferencia:create` y no `movimiento:create`: el backend los separó
-          a propósito (HU-32), porque mover mercadería entre locales es una
-          decisión distinta de registrar una venta. Hoy los tres roles tienen
-          los dos, así que no cambia nada visible; el día que se restrinja uno
-          solo, esta guarda ya apunta al correcto.
-        */}
-        <Route
-          path="/transferencias"
-          element={
-            <RutaProtegida permiso={{ transferencia: ["create"] }}>
-              <Transferencias />
-            </RutaProtegida>
-          }
-        />
-        <Route
-          path="/productos/:id"
-          element={
-            <RutaProtegida>
-              <DetalleProducto />
-            </RutaProtegida>
-          }
-        />
+        <Route element={<Layout />}>
+          <Route
+            path="/"
+            element={
+              <RutaProtegida>
+                <Inicio />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion"
+            element={
+              <RutaProtegida>
+                <Configuracion />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/productos"
+            element={
+              <RutaProtegida>
+                <Productos />
+              </RutaProtegida>
+            }
+          />
+          {/*
+            Escanear exige `producto:create` y no `read`: el endpoint que consulta
+            el código (`GET /api/productos/codigo/:codigoBarras`) existe para dar
+            de alta lo que se escanea, así que el backend lo cierra con create. No
+            hay variante de solo lectura que ofrecerle al empleado.
+          */}
+          <Route
+            path="/productos/escanear"
+            element={
+              <RutaProtegida permiso={{ producto: ["create"] }}>
+                <EscanearProducto />
+              </RutaProtegida>
+            }
+          />
+          {/*
+            Va antes que `/productos/:id` en el archivo por prolijidad, pero no
+            depende de eso: React Router rankea por especificidad, así que un
+            segmento fijo como "importar" siempre le gana al `:id`.
+          */}
+          <Route
+            path="/productos/importar"
+            element={
+              <RutaProtegida
+                permiso={{ producto: ["create"] }}
+                mensajeSinPermiso="Tu rol no puede importar productos. Pedile a quien administra el comercio —el propietario o el gerente— que suba la planilla."
+              >
+                <ImportarProductos />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/movimientos"
+            element={
+              <RutaProtegida>
+                <HistorialMovimientos />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/movimientos/nuevo"
+            element={
+              <RutaProtegida permiso={{ movimiento: ["create"] }}>
+                <RegistrarMovimiento />
+              </RutaProtegida>
+            }
+          />
+          {/*
+            `transferencia:create` y no `movimiento:create`: el backend los separó
+            a propósito (HU-32), porque mover mercadería entre locales es una
+            decisión distinta de registrar una venta. Hoy los tres roles tienen
+            los dos, así que no cambia nada visible; el día que se restrinja uno
+            solo, esta guarda ya apunta al correcto.
+          */}
+          <Route
+            path="/transferencias"
+            element={
+              <RutaProtegida permiso={{ transferencia: ["create"] }}>
+                <Transferencias />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/productos/:id"
+            element={
+              <RutaProtegida>
+                <DetalleProducto />
+              </RutaProtegida>
+            }
+          />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {/*

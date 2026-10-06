@@ -1,30 +1,39 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Inicio from "./Inicio";
+import { EVENTO_ABRIR_ASISTENTE } from "../services/asistente";
 import { configuracionDe } from "../tests/permisos";
 
-vi.mock("../hooks/useAuth", () => ({ useAuth: vi.fn() }));
+/**
+ * Inicio: el resumen del negocio.
+ *
+ * Los tests de accesos por rol que vivían acá se mudaron a
+ * `components/Navegacion.test.jsx`, junto con los accesos.
+ */
 
-vi.mock("../services/auth", () => ({ cerrarSesion: vi.fn() }));
+vi.mock("../hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 vi.mock("../services/configuracion", async (original) => ({
   ...(await original()),
   obtenerConfiguracion: vi.fn(),
 }));
 
+vi.mock("../services/productos", async (original) => ({
+  ...(await original()),
+  obtenerProductos: vi.fn(),
+}));
+
+vi.mock("../services/movimientos", async (original) => ({
+  ...(await original()),
+  obtenerHistorial: vi.fn(),
+}));
+
 const { useAuth } = await import("../hooks/useAuth");
 const { obtenerConfiguracion } = await import("../services/configuracion");
-
-/** Los seis accesos de la pantalla, por el testid que usa también el E2E. */
-const ACCESOS = [
-  "acceso-registrar-movimiento",
-  "acceso-historial",
-  "acceso-transferir",
-  "acceso-productos",
-  "acceso-escanear",
-  "acceso-configuracion",
-];
+const { obtenerProductos } = await import("../services/productos");
+const { obtenerHistorial } = await import("../services/movimientos");
 
 function renderizar() {
   return render(
@@ -34,94 +43,105 @@ function renderizar() {
   );
 }
 
-/** Los accesos que están hoy en pantalla, en orden. */
-function visibles() {
-  return ACCESOS.filter((id) => screen.queryByTestId(id) !== null);
+/** La tarjeta del resumen que tiene ese título. */
+function tarjeta(titulo) {
+  return screen.getByText(titulo).parentElement;
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.clearAllMocks();
-  const { olvidarPermisos } = await import("../services/permisos");
-  olvidarPermisos();
   useAuth.mockReturnValue({ usuario: { name: "Ana" } });
+  obtenerConfiguracion.mockResolvedValue(
+    configuracionDe("propietario", {
+      ubicaciones: [{ id: "u1", nombre: "Local" }, { id: "u2", nombre: "Depósito" }],
+    }),
+  );
+  obtenerProductos.mockResolvedValue([{ id: "p1" }, { id: "p2" }, { id: "p3" }]);
+  obtenerHistorial.mockResolvedValue({ movimientos: [], paginacion: { total: 12 } });
 });
 
-describe("Accesos según el rol", () => {
-  test("el propietario ve los seis", async () => {
-    obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
-
+describe("Saludo", () => {
+  test("saluda por el nombre, con el título que buscan los E2E", () => {
     renderizar();
 
-    await waitFor(() => expect(visibles()).toEqual(ACCESOS));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Hola, Ana" }),
+    ).toBeInTheDocument();
   });
+});
 
-  test("el gerente ve los seis: opera el negocio completo", async () => {
-    obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
-
-    renderizar();
-
-    await waitFor(() => expect(visibles()).toEqual(ACCESOS));
-  });
-
-  // El único acceso que se pierde hoy, y el motivo de este punto de la HU: el
-  // escaneo consulta `GET /api/productos/codigo/:codigo`, que exige
-  // `producto:create`. Dejárselo al empleado era mandarlo derecho a un 403.
-  test("el empleado no ve «Escanear producto», y sí todo lo demás", async () => {
-    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
-
+describe("Resumen", () => {
+  test("muestra productos, movimientos de hoy y ubicaciones", async () => {
     renderizar();
 
     await waitFor(() =>
-      expect(visibles()).toEqual([
-        "acceso-registrar-movimiento",
-        "acceso-historial",
-        "acceso-transferir",
-        "acceso-productos",
-        "acceso-configuracion",
-      ]),
+      expect(tarjeta("Productos en el catálogo")).toHaveTextContent("3"),
     );
-
-    expect(screen.queryByTestId("acceso-escanear")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Escanear producto" }),
-    ).not.toBeInTheDocument();
+    expect(tarjeta("Movimientos de hoy")).toHaveTextContent("12");
+    expect(tarjeta("Ubicaciones de stock")).toHaveTextContent("2");
   });
 
-  // Configuración no cuelga de ningún permiso: aunque el empleado no vea
-  // Usuarios ni Auditoría, «Mis datos» (HU-31) es un derecho de los tres.
-  test("Configuración le queda a todos", async () => {
-    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+  test("los movimientos de hoy se piden filtrados por el día de hoy", async () => {
+    renderizar();
+
+    const hoy = new Date().toLocaleDateString("en-CA");
+    await waitFor(() =>
+      expect(obtenerHistorial).toHaveBeenCalledWith({ desde: hoy, hasta: hoy }),
+    );
+  });
+
+  test("si un dato no se pudo traer, muestra «—» y no rompe el resto", async () => {
+    obtenerProductos.mockRejectedValue(new Error("sin red"));
 
     renderizar();
 
-    expect(await screen.findByTestId("acceso-configuracion")).toHaveAttribute(
-      "href",
-      "/configuracion",
-    );
+    await waitFor(() => expect(tarjeta("Movimientos de hoy")).toHaveTextContent("12"));
+    expect(tarjeta("Productos en el catálogo")).toHaveTextContent("—");
   });
 });
 
-describe("Cuando no se sabe qué puede", () => {
-  // Dejar la pantalla de inicio con dos botones porque se cayó una request
-  // convierte un problema de red en una app que parece rota.
-  test("si la consulta falla se muestran todos", async () => {
-    obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
+describe("Asistente", () => {
+  test("el banner abre el asistente", async () => {
+    const usuario = userEvent.setup();
+    const escuchar = vi.fn();
+    window.addEventListener(EVENTO_ABRIR_ASISTENTE, escuchar);
 
     renderizar();
+    await usuario.click(
+      await screen.findByRole("button", { name: /Preguntale al asistente/ }),
+    );
 
-    await waitFor(() => expect(visibles()).toEqual(ACCESOS));
+    expect(escuchar).toHaveBeenCalledTimes(1);
+    window.removeEventListener(EVENTO_ABRIR_ASISTENTE, escuchar);
   });
 
-  test("mientras carga no se muestra ninguno de los que dependen del rol", () => {
-    obtenerConfiguracion.mockReturnValue(new Promise(() => {}));
+  test("sin permiso de asistente no se ofrece", async () => {
+    const base = configuracionDe("empleado");
+    const permisos = Object.fromEntries(
+      Object.entries(base.permisos).filter(([recurso]) => recurso !== "asistente"),
+    );
+    obtenerConfiguracion.mockResolvedValue({ ...base, permisos });
 
     renderizar();
 
-    // Configuración y «Cerrar sesión» no dependen del rol y están desde el
-    // primer render; el resto aparece cuando se sabe.
-    expect(visibles()).toEqual(["acceso-configuracion"]);
+    await waitFor(() => expect(obtenerConfiguracion).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(tarjeta("Ubicaciones de stock")).not.toHaveTextContent("—"),
+    );
     expect(
-      screen.getByRole("button", { name: "Cerrar sesión" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Preguntale al asistente/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("Contrato con la navegación", () => {
+  test("Inicio no tiene links: los accesos están en la navegación", async () => {
+    // Cualquier link acá chocaría por nombre con uno de la navegación —«Ver
+    // productos» contiene «productos»— y la búsqueda del link «Productos» que
+    // hacen los E2E encontraría dos.
+    renderizar();
+    await screen.findByRole("button", { name: /Preguntale al asistente/ });
+
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 });
