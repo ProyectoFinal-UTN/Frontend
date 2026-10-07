@@ -129,6 +129,19 @@ export default function SeccionRecomendaciones() {
       .then((respuesta) => {
         if (!montado.current) return;
 
+        // `apiFetch` devuelve `null` ante un 2xx sin cuerpo o con un JSON que
+        // no se pudo parsear. Guardarlo dejaba la sección en "Buscando
+        // sugerencias…" para siempre: un estado de carga que miente, porque ya
+        // no hay nada en vuelo. Para este contrato una respuesta vacía no es
+        // válida —`resumen` y `modo` nunca son opcionales— así que se trata
+        // como lo que es, un fallo, y cae en el `catch` de abajo con su
+        // "Reintentar".
+        if (!respuesta) {
+          throw new Error(
+            "No se pudieron leer las sugerencias. Probá de nuevo en un momento.",
+          );
+        }
+
         setDatos(respuesta);
         setFallo(null);
       })
@@ -182,7 +195,14 @@ export default function SeccionRecomendaciones() {
           Sugerencias para tu negocio
         </h2>
 
-        {!sinPermiso && (
+        {/*
+          Solo cuando ya hay algo que refrescar. Antes de la primera respuesta
+          no hay nada que actualizar, y el botón decía "Actualizando…" —porque
+          `cargando` arranca en `true`— arriba del "Buscando sugerencias…":
+          dos indicadores del mismo estado, uno con la palabra equivocada. Si
+          la primera carga falla, la salida es el "Reintentar" del aviso.
+        */}
+        {datos && !sinPermiso && (
           <button
             type="button"
             onClick={actualizar}
@@ -203,18 +223,35 @@ export default function SeccionRecomendaciones() {
       </div>
 
       {/*
-        El aviso de un fallo reemplaza al contenido: un 403 o una caída de red
-        no dejan nada sensato que mostrar debajo. `AvisoDeError` decide el
-        texto y la salida según el tipo (un 403 nunca manda al login).
+        Un fallo con datos en pantalla se avisa ARRIBA y no en lugar de ellos.
+        Si un refresco se cae, lo que ya se estaba viendo seguía siendo válido
+        un segundo antes: tirarlo abajo es perder información buena por un
+        problema de red, y contradice la misma razón por la que la lista no se
+        vacía mientras se refresca.
+
+        Las dos excepciones en las que el aviso SÍ toma el lugar del contenido:
+        la primera carga —no hay nada que conservar— y un 403, donde los datos
+        dejaron de corresponderle a este rol y no se siguen mostrando.
+
+        `AvisoDeError` decide el texto y la salida según el tipo; un 403 nunca
+        manda al login.
       */}
-      {fallo ? (
-        <AvisoDeError
-          fallo={fallo}
-          alReintentar={sinPermiso ? undefined : actualizar}
-        />
-      ) : !datos ? (
-        <p className="text-(--color-texto-apagado)">Buscando sugerencias…</p>
-      ) : (
+      {fallo && (
+        <div className={datos && !sinPermiso ? "mb-4" : undefined}>
+          <AvisoDeError
+            fallo={fallo}
+            alReintentar={sinPermiso ? undefined : actualizar}
+          />
+        </div>
+      )}
+
+      {!datos ? (
+        // Sin `fallo` todavía no llegó nada; con `fallo` el aviso ya ocupa el
+        // lugar y este texto mentiría diciendo que sigue buscando.
+        !fallo && (
+          <p className="text-(--color-texto-apagado)">Buscando sugerencias…</p>
+        )
+      ) : sinPermiso ? null : (
         <>
           <Encabezado datos={datos} hora={hora} />
 
@@ -304,6 +341,13 @@ function Encabezado({ datos, hora }) {
  *
  * Ojo con qué es "vacío": un comercio sin ventas NO cae acá, devuelve una
  * tarjeta `sin_historial`, que es contenido. Esto es el comercio ordenado.
+ *
+ * El texto NO repite que no hay nada: eso ya lo dice el `resumen` de arriba
+ * ("Por ahora no tengo sugerencias para hacerte: no hay productos por debajo
+ * del mínimo y los que tenés se están moviendo"). Decirlo dos veces, y encima
+ * arrancando con las mismas palabras, se lee como un error de armado. Lo que
+ * agrega esta línea es lo único que el resumen no dice: que esto se va a
+ * poblar solo, así que no hay que volver a mirar.
  */
 function Vacio() {
   return (
@@ -312,8 +356,7 @@ function Vacio() {
       className="mt-4 rounded-(--radius) bg-(--color-apagado) px-4 py-3 text-sm
                  font-semibold text-(--color-texto)"
     >
-      Por ahora no hay nada para sugerirte. Cuando algo baje del mínimo o deje
-      de moverse, te lo digo acá.
+      Te aviso acá cuando algo baje del mínimo o deje de moverse.
     </p>
   );
 }

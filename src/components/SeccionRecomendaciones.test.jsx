@@ -82,13 +82,35 @@ const SIN_HISTORIAL = {
   datos: { ventasEnVentana: 1, ventasMinimas: 3, dias: 30 },
 };
 
+/**
+ * El `resumen` de plantilla que el backend manda cuando no hay nada que
+ * recomendar (`RESUMEN_SIN_RECOMENDACIONES`).
+ *
+ * Está acá porque el `resumen` por defecto de los fixtures tiene que depender
+ * de si la lista está vacía, como pasa de verdad. Cuando no dependía, un
+ * fixture emparejaba lista vacía con "encontré 1 producto para reponer" —una
+ * combinación que el backend NUNCA emite— y eso escondió que el estado vacío
+ * repetía el resumen casi palabra por palabra.
+ */
+const RESUMEN_SIN_RECOMENDACIONES =
+  "Por ahora no tengo sugerencias para hacerte: no hay productos por debajo del mínimo y los que tenés se están moviendo.";
+
+const RESUMEN_CON_RECOMENDACIONES =
+  "Mirando tu negocio encontré 1 producto para reponer. Abajo te digo qué haría con cada uno.";
+
 function respuesta({ modo, recomendaciones, resumen, generadoEn } = {}) {
+  const lista = recomendaciones ?? [];
+
   return {
     generadoEn: generadoEn ?? GENERADO_EN,
     ventana: { dias: 30, desde: "2026-09-07T19:51:02.100Z" },
     modo: modo ?? "ia",
-    resumen: resumen ?? "Mirando tu negocio encontré 1 producto para reponer.",
-    recomendaciones: recomendaciones ?? [],
+    resumen:
+      resumen ??
+      (lista.length === 0
+        ? RESUMEN_SIN_RECOMENDACIONES
+        : RESUMEN_CON_RECOMENDACIONES),
+    recomendaciones: lista,
   };
 }
 
@@ -140,6 +162,26 @@ describe("Carga", () => {
     expect(screen.getByText("Buscando sugerencias…")).toBeInTheDocument();
     expect(screen.queryByTestId("recomendaciones-resumen")).not.toBeInTheDocument();
     expect(screen.queryByTestId("recomendaciones-vacio")).not.toBeInTheDocument();
+  });
+
+  test("en la primera carga no se ofrece «Actualizar»", () => {
+    // No hay nada que actualizar todavía, y el botón decía "Actualizando…"
+    // —porque `cargando` arranca en `true`— arriba del "Buscando sugerencias…":
+    // dos indicadores del mismo estado, uno con la palabra equivocada.
+    obtenerRecomendaciones.mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+
+    expect(screen.queryByTestId("recomendaciones-actualizar")).not.toBeInTheDocument();
+    expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument();
+  });
+
+  test("una vez que llegaron los datos, el botón aparece como «Actualizar»", async () => {
+    renderizar();
+
+    const boton = await screen.findByTestId("recomendaciones-actualizar");
+    expect(boton).toHaveTextContent("Actualizar");
+    expect(boton).not.toBeDisabled();
   });
 });
 
@@ -210,11 +252,33 @@ describe("El estado vacío depende de la lista, no de `modo`", () => {
       renderizar();
 
       expect(await screen.findByTestId("recomendaciones-vacio")).toHaveTextContent(
-        "Por ahora no hay nada para sugerirte. Cuando algo baje del mínimo o deje de moverse, te lo digo acá.",
+        "Te aviso acá cuando algo baje del mínimo o deje de moverse.",
       );
       expect(screen.queryByRole("list", { name: "Sugerencias" })).not.toBeInTheDocument();
     });
   }
+
+  test("el estado vacío no repite lo que ya dijo el resumen", async () => {
+    // Los dos textos se leen uno abajo del otro. El resumen ya dice que no hay
+    // nada; esta línea solo agrega que la sección se va a poblar sola. Antes
+    // los dos arrancaban con "Por ahora no…" y se leía como un error de
+    // armado.
+    obtenerRecomendaciones.mockResolvedValue(
+      respuesta({ modo: "sin_novedades", recomendaciones: [] }),
+    );
+
+    renderizar();
+
+    const vacio = await screen.findByTestId("recomendaciones-vacio");
+    const resumen = screen.getByTestId("recomendaciones-resumen");
+
+    expect(resumen).toHaveTextContent(RESUMEN_SIN_RECOMENDACIONES);
+    expect(vacio.textContent.trim()).toBe(
+      "Te aviso acá cuando algo baje del mínimo o deje de moverse.",
+    );
+    expect(vacio.textContent).not.toContain("no hay nada");
+    expect(vacio.textContent).not.toContain("Por ahora");
+  });
 });
 
 describe("El resumen", () => {
@@ -475,6 +539,61 @@ describe("Cuando la API dice que no", () => {
     expect(screen.queryByTestId("recomendaciones-actualizar")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
     expect(screen.getByTestId("aviso-permiso")).toBeInTheDocument();
+  });
+
+  test("un refresco que se cae NO se lleva puesto lo que ya se estaba viendo", async () => {
+    // Lo que había en pantalla seguía siendo válido un segundo antes. Tirarlo
+    // abajo es perder información buena por un problema de red, y contradice
+    // la misma razón por la que la lista no se vacía mientras se refresca.
+    obtenerRecomendaciones
+      .mockResolvedValueOnce(respuesta({ recomendaciones: [REPONER] }))
+      .mockRejectedValueOnce(new Error("sin red"));
+
+    const usuario = userEvent.setup();
+    renderizar();
+    await screen.findByTestId("recomendacion-reponer");
+
+    await usuario.click(screen.getByTestId("recomendaciones-actualizar"));
+
+    expect(await screen.findByTestId("aviso-general")).toBeInTheDocument();
+    // El aviso avisa; las recomendaciones siguen ahí.
+    expect(screen.getByTestId("recomendacion-reponer")).toBeInTheDocument();
+    expect(screen.getByText(REPONER.texto)).toBeInTheDocument();
+  });
+
+  test("pero un 403 al refrescar sí esconde los datos", async () => {
+    // Acá no es un problema de red: al rol dejó de corresponderle esta lectura
+    // —le cambiaron el rol con la app abierta— así que lo que había en pantalla
+    // no se sigue mostrando.
+    obtenerRecomendaciones
+      .mockResolvedValueOnce(respuesta({ recomendaciones: [REPONER] }))
+      .mockRejectedValueOnce(
+        falloHttp(403, "El rol no tiene permiso para esta accion"),
+      );
+
+    const usuario = userEvent.setup();
+    renderizar();
+    await screen.findByTestId("recomendacion-reponer");
+
+    await usuario.click(screen.getByTestId("recomendaciones-actualizar"));
+
+    expect(await screen.findByTestId("aviso-permiso")).toBeInTheDocument();
+    expect(screen.queryByTestId("recomendacion-reponer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("recomendaciones-resumen")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("recomendaciones-actualizar")).not.toBeInTheDocument();
+  });
+
+  test("un 2xx con el cuerpo ilegible es un fallo, no un «buscando» eterno", async () => {
+    // `apiFetch` devuelve `null` ante un 2xx sin cuerpo o con un JSON que no
+    // se pudo parsear. Guardarlo dejaba un estado de carga que mentía: no
+    // había nada en vuelo y la pantalla seguía diciendo "Buscando sugerencias…".
+    obtenerRecomendaciones.mockResolvedValueOnce(null);
+
+    renderizar();
+
+    expect(await screen.findByTestId("aviso-general")).toBeInTheDocument();
+    expect(screen.queryByText("Buscando sugerencias…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 
   test("un fallo de red se puede reintentar, y al volver muestra los datos", async () => {

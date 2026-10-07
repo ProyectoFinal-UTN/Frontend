@@ -247,8 +247,16 @@ describe("Contrato con la navegación", () => {
       .map((link) => link.getAttribute("aria-label") ?? link.textContent);
 
     expect(nombres).toEqual(["Ver stock de Yerba Playadito"]);
+
+    // Por SUBSTRING y no por igualdad: así matchea Playwright cuando no se le
+    // pasa `exact`, que es como buscan los page objects de Infraestructura. Un
+    // link «Ver productos» no es igual a «Productos» pero lo contiene, y la
+    // búsqueda del link «Productos» encontraría dos. Comparar por igualdad
+    // dejaba pasar justo ese caso.
     for (const nombre of nombres) {
-      expect(NOMBRES_DE_LA_NAVEGACION).not.toContain(nombre);
+      for (const deLaNavegacion of NOMBRES_DE_LA_NAVEGACION) {
+        expect(nombre.toLowerCase()).not.toContain(deLaNavegacion.toLowerCase());
+      }
     }
   });
 });
