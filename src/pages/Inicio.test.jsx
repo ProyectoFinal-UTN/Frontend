@@ -30,10 +30,16 @@ vi.mock("../services/movimientos", async (original) => ({
   obtenerHistorial: vi.fn(),
 }));
 
+vi.mock("../services/asistente", async (original) => ({
+  ...(await original()),
+  obtenerRecomendaciones: vi.fn(),
+}));
+
 const { useAuth } = await import("../hooks/useAuth");
 const { obtenerConfiguracion } = await import("../services/configuracion");
 const { obtenerProductos } = await import("../services/productos");
 const { obtenerHistorial } = await import("../services/movimientos");
+const { obtenerRecomendaciones } = await import("../services/asistente");
 
 function renderizar() {
   return render(
@@ -58,6 +64,13 @@ beforeEach(() => {
   );
   obtenerProductos.mockResolvedValue([{ id: "p1" }, { id: "p2" }, { id: "p3" }]);
   obtenerHistorial.mockResolvedValue({ movimientos: [], paginacion: { total: 12 } });
+  obtenerRecomendaciones.mockResolvedValue({
+    generadoEn: "2026-10-07T19:51:02.100Z",
+    ventana: { dias: 30, desde: "2026-09-07T19:51:02.100Z" },
+    modo: "sin_novedades",
+    resumen: "Por ahora no tengo sugerencias para hacerte.",
+    recomendaciones: [],
+  });
 });
 
 describe("Saludo", () => {
@@ -134,14 +147,116 @@ describe("Asistente", () => {
   });
 });
 
-describe("Contrato con la navegación", () => {
-  test("Inicio no tiene links: los accesos están en la navegación", async () => {
-    // Cualquier link acá chocaría por nombre con uno de la navegación —«Ver
-    // productos» contiene «productos»— y la búsqueda del link «Productos» que
-    // hacen los E2E encontraría dos.
+describe("Recomendaciones (HU-27)", () => {
+  test("con permiso, la sección está y se pide al entrar", async () => {
     renderizar();
-    await screen.findByRole("button", { name: /Preguntale al asistente/ });
 
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    expect(await screen.findByTestId("recomendaciones")).toBeInTheDocument();
+    expect(obtenerRecomendaciones).toHaveBeenCalledTimes(1);
+  });
+
+  test("va ANTES del banner del asistente", async () => {
+    // El banner dice «preguntale qué reponer hoy»: arriba de la sección que ya
+    // lo contesta se lee como un formulario para preguntar algo respondido más
+    // abajo.
+    renderizar();
+
+    const seccion = await screen.findByTestId("recomendaciones");
+    const banner = screen.getByRole("button", { name: /Preguntale al asistente/ });
+
+    expect(
+      seccion.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  test("sin el permiso `recomendaciones` no aparece NI se pide", async () => {
+    // El empleado tiene `asistente: ["consultar"]` y no `recomendaciones`: ve
+    // el asistente, no las sugerencias de gestión. Que no se pida importa tanto
+    // como que no se muestre: si se pidiera, cada carga de Inicio de un
+    // empleado sería un 403 garantizado.
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+
+    await screen.findByRole("button", { name: /Preguntale al asistente/ });
+    expect(screen.queryByTestId("recomendaciones")).not.toBeInTheDocument();
+    expect(obtenerRecomendaciones).not.toHaveBeenCalled();
+  });
+
+  test("mientras los permisos no están resueltos no se pide nada", async () => {
+    obtenerConfiguracion.mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+
+    await waitFor(() => expect(obtenerProductos).toHaveBeenCalled());
+    expect(screen.queryByTestId("recomendaciones")).not.toBeInTheDocument();
+    expect(obtenerRecomendaciones).not.toHaveBeenCalled();
+  });
+
+  test("si no se pudieron averiguar los permisos, se ofrece igual", async () => {
+    // `puedeSalvoQueFalle`: esconderla le sacaría las sugerencias a quien sí
+    // puede verlas. Mostrarla de más termina en un 403 del backend, que es la
+    // autoridad y además lo explica.
+    obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
+
+    renderizar();
+
+    expect(await screen.findByTestId("recomendaciones")).toBeInTheDocument();
+  });
+});
+
+describe("Contrato con la navegación", () => {
+  /** Los nombres accesibles de los accesos de `components/Navegacion.jsx`. */
+  const NOMBRES_DE_LA_NAVEGACION = [
+    "Inicio",
+    "Productos",
+    "Configuración",
+    "Registrar movimiento",
+    "Historial de movimientos",
+    "Transferir stock",
+    "Escanear producto",
+  ];
+
+  test("ningún link de Inicio choca por nombre con uno de la navegación", async () => {
+    // La regla no es «Inicio no tiene links» sino que ninguno colisione: un
+    // «Ver productos» contendría «Productos» y la búsqueda del link
+    // «Productos» que hacen los E2E encontraría dos. Las sugerencias de HU-27
+    // traen links «Ver stock de <producto>», que no colisionan con ninguno.
+    obtenerRecomendaciones.mockResolvedValue({
+      generadoEn: "2026-10-07T19:51:02.100Z",
+      ventana: { dias: 30, desde: "2026-09-07T19:51:02.100Z" },
+      modo: "ia",
+      resumen: "Encontré 1 producto para reponer.",
+      recomendaciones: [
+        {
+          tipo: "reponer",
+          prioridad: "alta",
+          producto: { id: "p-1", nombre: "Yerba Playadito" },
+          texto: "No te queda nada de Yerba Playadito.",
+          porQue: "No quedan existencias y el mínimo configurado es 1.",
+          datos: { enStock: 0, umbralMinimo: 1, unidadMedida: "unidad", faltanteHastaElUmbral: 1 },
+        },
+      ],
+    });
+
+    renderizar();
+    await screen.findByTestId("recomendacion-reponer");
+
+    const nombres = screen
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("aria-label") ?? link.textContent);
+
+    expect(nombres).toEqual(["Ver stock de Yerba Playadito"]);
+
+    // Por SUBSTRING y no por igualdad: así matchea Playwright cuando no se le
+    // pasa `exact`, que es como buscan los page objects de Infraestructura. Un
+    // link «Ver productos» no es igual a «Productos» pero lo contiene, y la
+    // búsqueda del link «Productos» encontraría dos. Comparar por igualdad
+    // dejaba pasar justo ese caso.
+    for (const nombre of nombres) {
+      for (const deLaNavegacion of NOMBRES_DE_LA_NAVEGACION) {
+        expect(nombre.toLowerCase()).not.toContain(deLaNavegacion.toLowerCase());
+      }
+    }
   });
 });
