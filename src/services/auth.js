@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react";
+import { olvidarPermisos } from "./permisos";
 
 /**
  * Autenticación: única puerta entre las páginas y Better Auth.
@@ -194,6 +195,11 @@ export async function cerrarSesion() {
   if (error) {
     return { ok: false, error: traducirError(error) };
   }
+
+  // Los permisos del rol que se va no pueden sobrevivir al logout: quien entre
+  // después en esta misma pestaña puede ser otra persona con otro rol, y la UI
+  // le ofrecería lo que veía la anterior hasta el próximo refresh (HU-32).
+  olvidarPermisos();
 
   await esperarSesionActualizada();
 

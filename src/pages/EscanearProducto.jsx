@@ -107,7 +107,7 @@ export default function EscanearProducto() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center gap-4 px-4 py-10">
+    <main className="mx-auto flex w-full max-w-xl flex-col items-center gap-4 px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
       <h1 className="text-3xl font-extrabold text-(--color-texto)">
         Escanear código de barras
       </h1>

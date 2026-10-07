@@ -3,6 +3,11 @@ import {
   SENTIDOS,
   TIPOS_MOVIMIENTO,
   TIPO_CON_SENTIDO,
+  TIPOS_HISTORIAL,
+  etiquetaDeTipo,
+  finDelDia,
+  inicioDelDia,
+  obtenerHistorial,
   registrarMovimiento,
 } from "./movimientos";
 import { apiFetch } from "./api";
@@ -98,5 +103,95 @@ describe("Catalogo de tipos", () => {
   test("el ajuste es el tipo que necesita sentido", () => {
     expect(TIPO_CON_SENTIDO).toBe("ajuste");
     expect(SENTIDOS.map(({ valor }) => valor)).toEqual(["entrada", "salida"]);
+  });
+});
+
+describe("límites del día (HU-14)", () => {
+  test("el inicio es la medianoche local del día, en ISO UTC", () => {
+    expect(inicioDelDia("2026-09-18")).toBe(
+      new Date(2026, 8, 18, 0, 0, 0, 0).toISOString(),
+    );
+  });
+
+  test("el fin es el último milisegundo local del día", () => {
+    expect(finDelDia("2026-09-18")).toBe(
+      new Date(2026, 8, 18, 23, 59, 59, 999).toISOString(),
+    );
+  });
+
+  test("siempre viajan con la Z que exige el backend", () => {
+    expect(inicioDelDia("2026-01-01")).toMatch(/Z$/);
+    expect(finDelDia("2026-01-01")).toMatch(/Z$/);
+  });
+
+  test("un día vacío o mal formado no genera límite", () => {
+    expect(inicioDelDia("")).toBeUndefined();
+    expect(finDelDia(undefined)).toBeUndefined();
+    expect(inicioDelDia("18/09/2026")).toBeUndefined();
+  });
+});
+
+describe("obtenerHistorial", () => {
+  test("sin filtros pide /movimientos sin query string", async () => {
+    apiFetch.mockResolvedValueOnce({});
+
+    await obtenerHistorial();
+
+    expect(apiFetch).toHaveBeenCalledWith("/movimientos");
+  });
+
+  test("manda los filtros puestos y omite los vacíos", async () => {
+    apiFetch.mockResolvedValueOnce({});
+
+    await obtenerHistorial({
+      productoId: "p1",
+      tipo: "venta",
+      ubicacionId: "",
+      proveedorId: undefined,
+    });
+
+    const url = new URL(apiFetch.mock.calls[0][0], "http://x");
+    expect(url.pathname).toBe("/movimientos");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      productoId: "p1",
+      tipo: "venta",
+    });
+  });
+
+  test("convierte los días a instantes: desde al inicio, hasta al fin", async () => {
+    apiFetch.mockResolvedValueOnce({});
+
+    await obtenerHistorial({ desde: "2026-09-01", hasta: "2026-09-18" });
+
+    const url = new URL(apiFetch.mock.calls[0][0], "http://x");
+    expect(url.searchParams.get("desde")).toBe(inicioDelDia("2026-09-01"));
+    expect(url.searchParams.get("hasta")).toBe(finDelDia("2026-09-18"));
+  });
+
+  test("la página 1 no se manda; las siguientes sí", async () => {
+    apiFetch.mockResolvedValue({});
+
+    await obtenerHistorial({ pagina: 1 });
+    expect(apiFetch).toHaveBeenLastCalledWith("/movimientos");
+
+    await obtenerHistorial({ pagina: 3 });
+    expect(apiFetch).toHaveBeenLastCalledWith("/movimientos?pagina=3");
+  });
+});
+
+describe("tipos del historial", () => {
+  test("incluyen transferencia, que no se registra a mano pero se consulta", () => {
+    expect(TIPOS_HISTORIAL.map(({ valor }) => valor)).toEqual([
+      "compra",
+      "venta",
+      "ajuste",
+      "merma",
+      "transferencia",
+    ]);
+  });
+
+  test("un tipo desconocido se muestra tal cual en vez de desaparecer", () => {
+    expect(etiquetaDeTipo("merma")).toBe("Merma");
+    expect(etiquetaDeTipo("otro")).toBe("otro");
   });
 });

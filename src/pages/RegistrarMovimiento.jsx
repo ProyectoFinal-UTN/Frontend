@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import Bloqueado from "../components/Bloqueado";
 import Campo from "../components/Campo";
 import CampoSelect from "../components/CampoSelect";
 import { obtenerUbicaciones } from "../services/configuracion";
 import {
   SENTIDOS,
   TIPOS_MOVIMIENTO,
+  TIPOS_QUE_EXIGEN_MOTIVO,
   TIPO_CON_SENTIDO,
   registrarMovimiento,
 } from "../services/movimientos";
@@ -36,6 +38,7 @@ const CAMPOS_VACIOS = {
   productoId: "",
   tipo: "",
   sentido: "",
+  motivo: "",
   cantidad: "",
   ubicacionId: "",
 };
@@ -82,33 +85,6 @@ function mensajeConfirmacion({ producto, ubicacion, cantidad }) {
     : `Listo. ${sujeto} quedó con ${unidades}.`;
 }
 
-/**
- * Lo que falta configurar antes de poder mover stock, con el link para ir a
- * hacerlo.
- *
- * Sin productos o sin ubicaciones el formulario no puede funcionar, y el
- * backend respondería un 400 recién al confirmar. Más vale decirlo antes y
- * ofrecer la salida que dejar completar algo que se va a rechazar.
- *
- * El link lleva a la pantalla, sin prometer que ahí se pueda crear: un
- * `empleado` solo tiene lectura sobre productos y ubicaciones, así que un
- * «Cargar el primero» lo mandaba a comerse un 403. Mostrarle directamente a
- * quién pedírselo requiere conocer el rol en el front, y eso llega con HU-4.
- */
-function Bloqueado({ mensaje, a, accion }) {
-  return (
-    <div className="rounded-(--radius) bg-(--color-apagado) px-4 py-8 text-center">
-      <p className="font-bold text-(--color-texto)">{mensaje}</p>
-      <Link
-        to={a}
-        className="mt-3 inline-block text-sm font-bold text-(--color-primario) underline"
-      >
-        {accion}
-      </Link>
-    </div>
-  );
-}
-
 function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
   const [campos, setCampos] = useState(CAMPOS_VACIOS);
   const [errores, setErrores] = useState({});
@@ -151,6 +127,13 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
       // Cambiar de ajuste a otro tipo deja un sentido colgado que ya no aplica
       // y que se enviaría en el próximo submit.
       ...(name === "tipo" && value !== TIPO_CON_SENTIDO ? { sentido: "" } : {}),
+      // Lo mismo con el motivo, y acá importa más: escribir "se venció" en una
+      // merma, cambiar a compra y confirmar dejaría esa explicación pegada a una
+      // operación que no es la que se explicó. El libro es append-only, así que
+      // esa fila no se corrige después.
+      ...(name === "tipo" && !TIPOS_QUE_EXIGEN_MOTIVO.includes(value)
+        ? { motivo: "" }
+        : {}),
     }));
 
     // El error se limpia apenas tocan el campo: dejarlo mientras corrigen es
@@ -190,6 +173,13 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
 
     if (seleccion.tipo === TIPO_CON_SENTIDO) {
       datos.sentido = seleccion.sentido;
+    }
+
+    // Solo viaja en los tipos que lo piden, que son los únicos donde el campo
+    // se mostró. Se manda recortado porque es lo que el backend guarda: así lo
+    // que se ve en el formulario y lo que queda en el libro son lo mismo.
+    if (TIPOS_QUE_EXIGEN_MOTIVO.includes(seleccion.tipo)) {
+      datos.motivo = seleccion.motivo.trim();
     }
 
     if (pideUbicacion) {
@@ -238,10 +228,20 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
       cantidad: typeof stock?.cantidad === "number" ? stock.cantidad : null,
     });
 
-    // Se limpian solo la cantidad y el sentido. Dejar puestos el producto, el
-    // tipo y la ubicación hace que el segundo movimiento seguido cueste un
-    // paso en vez de tres, que es de lo que se trata el RNF1.
-    setCampos((previos) => ({ ...previos, cantidad: "", sentido: "" }));
+    // Se limpian la cantidad, el sentido y el motivo. Dejar puestos el
+    // producto, el tipo y la ubicación hace que el segundo movimiento seguido
+    // cueste un paso en vez de tres, que es de lo que se trata el RNF1.
+    //
+    // El motivo se limpia aunque el tipo quede elegido, y es el que no se puede
+    // dejar: dos mermas seguidas del mismo producto casi nunca son por lo
+    // mismo, y reusar la explicación de la primera escribe en el libro un
+    // motivo que nadie eligió para esa fila.
+    setCampos((previos) => ({
+      ...previos,
+      cantidad: "",
+      sentido: "",
+      motivo: "",
+    }));
   }
 
   /**
@@ -402,6 +402,32 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
         </fieldset>
       )}
 
+      {/*
+        Solo en ajuste y merma (HU-15). En una compra o una venta el campo no
+        existe: agregarlo a los cuatro tipos le sumaría un paso al flujo más
+        usado del sistema, que es justo lo que el RNF1 pide no hacer.
+
+        Va acá, pegado al sentido, porque los dos salen del tipo elegido:
+        juntos, el formulario crece y se achica en un solo lugar en vez de
+        moverse por el medio.
+
+        Sin `maxLength`: el atributo recortaría en silencio lo que se escriba de
+        más y la persona se enteraría recién al releer lo que quedó guardado.
+        Mejor dejarlo escribir y que `validarMotivo` avise que se pasó.
+      */}
+      {TIPOS_QUE_EXIGEN_MOTIVO.includes(seleccion.tipo) && (
+        <Campo
+          id="motivo"
+          etiqueta="Motivo"
+          type="text"
+          autoComplete="off"
+          placeholder="Se venció, rotura, conteo de inventario…"
+          value={seleccion.motivo}
+          onChange={alEscribir}
+          error={errores.motivo}
+        />
+      )}
+
       <Campo
         id="cantidad"
         etiqueta="Cantidad"
@@ -505,7 +531,7 @@ export default function RegistrarMovimiento() {
   }, [cargar]);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
+    <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
       <header className="mb-6">
         <Link
           to="/"

@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 import {
   MAXIMO_ENTERO,
   validarCantidad,
+  validarMotivo,
   validarMovimiento,
 } from "./RegistrarMovimiento.validacion";
+import { MOTIVO_MAXIMO } from "../services/movimientos";
 
 /** Un formulario completo y válido, tal como sale de los inputs: todo string. */
 const VALIDO = {
@@ -52,6 +54,9 @@ describe("Sentido del ajuste", () => {
       ...VALIDO,
       tipo: "ajuste",
       sentido: "salida",
+      // Un ajuste sin motivo ya no es válido (HU-15), así que este caso lo
+      // lleva para poder afirmar que no queda ningún otro error.
+      motivo: "Conteo de inventario",
     });
 
     expect(errores).toEqual({});
@@ -61,6 +66,52 @@ describe("Sentido del ajuste", () => {
     for (const tipo of ["compra", "venta", "merma"]) {
       expect(validarMovimiento({ ...VALIDO, tipo }).sentido).toBeUndefined();
     }
+  });
+});
+
+describe("Motivo del ajuste y la merma", () => {
+  /** Un ajuste al que solo le falta el motivo. */
+  const AJUSTE = { ...VALIDO, tipo: "ajuste", sentido: "salida" };
+
+  test("lo exige en el ajuste", () => {
+    expect(validarMovimiento(AJUSTE).motivo).toMatch(/escribí el motivo/i);
+  });
+
+  test("lo exige en la merma", () => {
+    const errores = validarMovimiento({ ...VALIDO, tipo: "merma" });
+
+    expect(errores.motivo).toMatch(/escribí el motivo/i);
+  });
+
+  test("rechaza un motivo que es solo espacios", () => {
+    // El backend le hace `trim()` antes de medirlo: "   " le vale lo mismo que
+    // no mandar nada y responde 400. Acá se frena antes.
+    const errores = validarMovimiento({ ...AJUSTE, motivo: "   " });
+
+    expect(errores.motivo).toMatch(/escribí el motivo/i);
+  });
+
+  test("lo da por bueno cuando viene escrito", () => {
+    const errores = validarMovimiento({ ...AJUSTE, motivo: "Se venció" });
+
+    expect(errores).toEqual({});
+  });
+
+  test("no lo pide en la compra ni en la venta, que se explican solas", () => {
+    for (const tipo of ["compra", "venta"]) {
+      expect(validarMovimiento({ ...VALIDO, tipo }).motivo).toBeUndefined();
+    }
+  });
+
+  test("acepta el largo maximo exacto y rechaza pasarse", () => {
+    // El tope es el varchar(255) de la columna: un carácter más y el backend
+    // responde 400.
+    const justo = "a".repeat(MOTIVO_MAXIMO);
+
+    expect(validarMovimiento({ ...AJUSTE, motivo: justo }).motivo).toBeUndefined();
+    expect(
+      validarMovimiento({ ...AJUSTE, motivo: `${justo}a` }).motivo,
+    ).toMatch(/no puede superar/i);
   });
 });
 
@@ -164,5 +215,33 @@ describe("validarCantidad, usada tambien por DetalleProducto", () => {
       `No puede superar ${MAXIMO_ENTERO}.`,
     );
     expect(validarCantidad(String(MAXIMO_ENTERO))).toBeNull();
+  });
+});
+
+describe("validarMotivo, usada tambien por DetalleProducto", () => {
+  // Mismo caso que `validarCantidad`: `DetalleProducto.jsx` la importa para su
+  // ajuste por fila, donde el tipo es siempre `ajuste` y no hay nada que
+  // decidir. Los casos de arriba la ejercitan a traves de `validarMovimiento`;
+  // estos la prueban directo y con el mensaje textual.
+
+  test("acepta un motivo escrito", () => {
+    expect(validarMotivo("Rotura en el deposito")).toBeNull();
+  });
+
+  test("lo pide cuando viene vacio, nulo o solo espacios", () => {
+    for (const valor of ["", "   ", null, undefined]) {
+      expect(validarMotivo(valor)).toBe("Escribí el motivo de este movimiento.");
+    }
+  });
+
+  test("mide el largo despues del trim", () => {
+    // Los espacios de los costados no cuentan para el tope, porque tampoco
+    // llegan a la base: el backend guarda el motivo ya recortado.
+    const justo = "a".repeat(MOTIVO_MAXIMO);
+
+    expect(validarMotivo(`  ${justo}  `)).toBeNull();
+    expect(validarMotivo(`${justo}a`)).toBe(
+      `No puede superar ${MOTIVO_MAXIMO} caracteres.`,
+    );
   });
 });

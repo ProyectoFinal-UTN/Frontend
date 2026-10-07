@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ResumenImportacion from "../components/ResumenImportacion";
 import VistaPreviaCsv from "../components/VistaPreviaCsv";
-import { obtenerConfiguracion } from "../services/configuracion";
 import { importarCatalogo } from "../services/productos";
 import {
   MAXIMO_FILAS,
@@ -42,11 +41,10 @@ export default function ImportarProductos() {
   const [error, setError] = useState("");
   const [subiendo, setSubiendo] = useState(false);
 
-  // El rol decide si esta pantalla tiene sentido para quien la abre. Viene del
-  // backend y no del cliente, igual que en la configuración: acá solo cambia lo
-  // que se muestra, el permiso real lo sigue chequeando el endpoint.
-  const [rol, setRol] = useState(null);
-  const [cargandoRol, setCargandoRol] = useState(true);
+  // Quién puede entrar acá lo decide la guarda de la ruta en `App.jsx`
+  // (`producto:create`, HU-32). Esta pantalla ya no consulta el rol por su
+  // cuenta: era la tercera request al mismo endpoint, y dejaba el criterio
+  // repetido en dos lugares que podían discrepar.
 
   const montado = useRef(true);
 
@@ -55,20 +53,6 @@ export default function ImportarProductos() {
     return () => {
       montado.current = false;
     };
-  }, []);
-
-  useEffect(() => {
-    obtenerConfiguracion()
-      .then((configuracion) => {
-        if (montado.current) setRol(configuracion.rol);
-      })
-      // Si no se puede saber el rol, se muestra la pantalla igual: el backend
-      // responde 403 si no corresponde, y ese mensaje es mejor que bloquear a
-      // alguien que sí tenía permiso porque una request secundaria falló.
-      .catch(() => {})
-      .finally(() => {
-        if (montado.current) setCargandoRol(false);
-      });
   }, []);
 
   function alElegirArchivo(evento) {
@@ -163,7 +147,7 @@ export default function ImportarProductos() {
   const excedeMaximo = previa ? previa.excedeMaximo : false;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-10">
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
       <header className="mb-6">
         <Link
           to="/productos"
@@ -179,24 +163,7 @@ export default function ImportarProductos() {
         </p>
       </header>
 
-      {cargandoRol && (
-        <p className="text-(--color-texto-apagado)">Cargando…</p>
-      )}
-
-      {!cargandoRol && rol === "empleado" && (
-        <div className="rounded-(--radius) border-2 border-(--color-borde) bg-(--color-tarjeta) p-4">
-          <h2 className="text-lg font-extrabold text-(--color-texto)">
-            Tu rol no puede importar productos
-          </h2>
-          <p className="mt-2 text-(--color-texto-apagado)">
-            Pedile a quien administra el comercio —el propietario o el gerente—
-            que suba la planilla.
-          </p>
-        </div>
-      )}
-
-      {!cargandoRol && rol !== "empleado" && (
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
           {error && (
             <div
               role="alert"
@@ -289,8 +256,7 @@ export default function ImportarProductos() {
               )}
             </>
           )}
-        </div>
-      )}
+      </div>
     </main>
   );
 }
