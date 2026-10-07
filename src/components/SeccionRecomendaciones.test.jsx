@@ -119,12 +119,24 @@ function falloHttp(status, mensaje) {
   return Object.assign(new Error(mensaje), { status });
 }
 
-/** La hora como la formatea el componente, sin atarse al huso del que corra. */
+/**
+ * La hora como la formatea el componente, sin atarse al huso del que corra.
+ *
+ * Ojo: esto espeja la implementacion, asi que por si solo NO prueba el
+ * formato —da verde con cualquiera—. El formato se afirma aparte, con
+ * `esHoraDe24` sobre el texto renderizado.
+ */
 function horaEsperada(iso) {
   return new Date(iso).toLocaleTimeString("es-AR", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
+}
+
+/** "16:51" y no "04:51 p. m.", que es lo que da `es-AR` por defecto. */
+function esHoraDe24(texto) {
+  return /\b([01]\d|2[0-3]):[0-5]\d\b/.test(texto) && !/[ap]\.?\s?m\.?/i.test(texto);
 }
 
 function renderizar() {
@@ -295,6 +307,17 @@ describe("El resumen", () => {
     expect(screen.getByTestId("recomendaciones-generado-en")).toHaveTextContent(
       `Actualizado a las ${horaEsperada(GENERADO_EN)}`,
     );
+  });
+
+  test("la hora va en 24 horas, no «04:51 p. m.»", async () => {
+    // `es-AR` en ICU formatea en 12 horas por defecto, y "Actualizado a las
+    // 04:51 p. m." no es como se escribe ni se lee la hora acá. No lo caza la
+    // aserción de arriba, que compara contra la misma función que usa el
+    // componente y daría verde con cualquier formato.
+    renderizar();
+
+    const linea = await screen.findByTestId("recomendaciones-generado-en");
+    expect(esHoraDe24(linea.textContent)).toBe(true);
   });
 
   test("un `generadoEn` ilegible no tira la sección abajo", async () => {

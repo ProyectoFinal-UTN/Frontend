@@ -65,7 +65,7 @@ const TONOS_DE_PRIORIDAD = {
   },
 };
 
-/** "19:51". La hora sola: el día ya lo dice el encabezado de Inicio. */
+/** "16:51". La hora sola: el día ya lo dice el encabezado de Inicio. */
 function horaDe(generadoEn) {
   const fecha = new Date(generadoEn);
 
@@ -76,6 +76,11 @@ function horaDe(generadoEn) {
   return fecha.toLocaleTimeString("es-AR", {
     hour: "2-digit",
     minute: "2-digit",
+    // `hour12: false` explícito: el default de `es-AR` en ICU es de 12 horas y
+    // sale "04:51 p. m.", que acá nadie escribe ni lee de un vistazo. En
+    // Argentina la hora se dice 16:51. Se vio mirando la pantalla, no en un
+    // test: la aserción comparaba contra la misma función y daba verde igual.
+    hour12: false,
   });
 }
 
