@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeftRight, ChevronRight, MapPin, Package, Sparkles } from "lucide-react";
+import SeccionRecomendaciones from "../components/SeccionRecomendaciones";
 import { useAuth } from "../hooks/useAuth";
 import { usePermisos } from "../hooks/usePermisos";
 import { obtenerHistorial } from "../services/movimientos";
@@ -16,10 +17,16 @@ import { EVENTO_ABRIR_ASISTENTE } from "../services/asistente";
  * alertas, rotación— es de la épica E4 (dashboard de KPIs), y no se inventan
  * números que todavía no existen.
  *
- * Las tarjetas NO son links, a propósito: "Productos en el catálogo" sería un
- * segundo link con "Productos" en el nombre, al lado del de la navegación, y
- * cualquier búsqueda del link "Productos" —la de un test, o la de quien usa
- * lector de pantalla— encontraría dos.
+ * Las tarjetas del resumen NO son links, a propósito: "Productos en el
+ * catálogo" sería un segundo link con "Productos" en el nombre, al lado del de
+ * la navegación, y cualquier búsqueda del link "Productos" —la de un test, o la
+ * de quien usa lector de pantalla— encontraría dos.
+ *
+ * La regla es esa —ningún link de Inicio puede chocar POR NOMBRE con uno de la
+ * navegación— y no "Inicio no tiene links". Las sugerencias de HU-27 traen
+ * links "Ver stock de <producto>", que no colisionan con ninguno: lo que no
+ * puede aparecer acá es un "Productos", un "Configuración" o un "Historial de
+ * movimientos".
  */
 
 /** "Martes, 6 de octubre", con mayúscula: es el principio de la línea. */
@@ -101,6 +108,23 @@ export default function Inicio() {
           />
         </div>
       </section>
+
+      {/*
+        Las sugerencias proactivas (HU-27) van ANTES del banner del asistente.
+        El banner dice "preguntale qué reponer hoy": arriba de una sección que
+        ya lo contesta se leería como un formulario para preguntar algo que está
+        respondido más abajo. Debajo funciona como el "¿y algo más?".
+
+        El gate es el de HU-32: se pregunta por ACCIÓN y no por rol, con
+        `resuelto &&` para que no aparezca y desaparezca un instante después, y
+        con `puedeSalvoQueFalle` (el alias `puede` de arriba) para que una
+        consulta de permisos caída no le saque la sección a quien sí puede
+        verla. Mientras no esté resuelto no se monta, así que un empleado no
+        dispara un 403 en cada carga de Inicio.
+      */}
+      {resuelto && puede("asistente", "recomendaciones") && (
+        <SeccionRecomendaciones />
+      )}
 
       {resuelto && puede("asistente", "consultar") && (
         <button

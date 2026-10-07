@@ -2,9 +2,10 @@
  * Los permisos efectivos de cada rol, SOLO PARA TESTS.
  *
  * Es una copia congelada de lo que devuelve `permisosDe()` en
- * `Backend/src/lib/permissions.js`, capturada ejecutándola contra la branch de
- * HU-32. Existe para poder renderizar una pantalla como empleado sin levantar
- * el backend.
+ * `Backend/src/lib/permissions.js`, capturada contra la branch de HU-32 y
+ * actualizada contra la de HU-27 (`asistente: ["consultar", "recomendaciones"]`).
+ * Existe para poder renderizar una pantalla como empleado sin levantar el
+ * backend.
  *
  * **No es la matriz del Frontend y no se usa fuera de los tests.** En
  * producción los permisos salen siempre de `GET /api/configuracion`: este repo
@@ -26,7 +27,7 @@ export const PERMISOS = Object.freeze({
     alerta: ["read", "update"],
     auditoria: ["read"],
     cuenta: ["read", "delete"],
-    asistente: ["consultar"],
+    asistente: ["consultar", "recomendaciones"],
   },
 
   // Opera el negocio completo pero no lo administra: ve el equipo en lectura,
@@ -42,7 +43,10 @@ export const PERMISOS = Object.freeze({
     transferencia: ["create"],
     alerta: ["read", "update"],
     cuenta: ["read", "delete"],
-    asistente: ["consultar"],
+    // Las recomendaciones de HU-27 también, aunque la historia diga "como
+    // propietario": decidir qué reponer y qué no se está moviendo es operar el
+    // negocio, que es lo que este rol hace.
+    asistente: ["consultar", "recomendaciones"],
   },
 
   // Registra movimientos y consulta. Ni `member`, ni `invitation`, ni
@@ -57,6 +61,9 @@ export const PERMISOS = Object.freeze({
     transferencia: ["create"],
     alerta: ["read"],
     cuenta: ["read", "delete"],
+    // Puede preguntarle al asistente, pero NO recibe las recomendaciones de
+    // gestión de HU-27: son una lectura del negocio, no una herramienta para
+    // atender el mostrador.
     asistente: ["consultar"],
   },
 });
