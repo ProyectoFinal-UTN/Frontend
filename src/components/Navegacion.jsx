@@ -11,6 +11,7 @@ import {
   ScanBarcode,
   Settings,
   Store,
+  Truck,
 } from "lucide-react";
 import { usePermisos } from "../hooks/usePermisos";
 import { cerrarSesion } from "../services/auth";
@@ -237,6 +238,20 @@ export default function Navegacion() {
             etiqueta="Transferir stock"
             icono={ArrowLeftRight}
             testId="acceso-transferir"
+          />
+        )}
+
+        {/*
+          En el panel y no en la barra: la barra de celular ya tiene cuatro
+          accesos más «Más», y proveedores se consulta menos que el resto.
+        */}
+        {resuelto && puede("proveedor", "read") && (
+          <Acceso
+            pathname={pathname}
+            a="/proveedores"
+            etiqueta="Proveedores"
+            icono={Truck}
+            testId="acceso-proveedores"
           />
         )}
 
