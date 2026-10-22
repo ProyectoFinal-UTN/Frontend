@@ -11,6 +11,7 @@ import Inicio from "./pages/Inicio";
 import Invitacion from "./pages/Invitacion";
 import Login from "./pages/Login";
 import Productos from "./pages/Productos";
+import Proveedores from "./pages/Proveedores";
 import Recuperar from "./pages/Recuperar";
 import Registro from "./pages/Registro";
 import RegistrarMovimiento from "./pages/RegistrarMovimiento";
@@ -120,6 +121,14 @@ export default function App() {
             element={
               <RutaProtegida permiso={{ transferencia: ["create"] }}>
                 <Transferencias />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/proveedores"
+            element={
+              <RutaProtegida permiso={{ proveedor: ["read"] }}>
+                <Proveedores />
               </RutaProtegida>
             }
           />

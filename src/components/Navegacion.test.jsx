@@ -23,12 +23,13 @@ vi.mock("../services/configuracion", async (original) => ({
 const { cerrarSesion } = await import("../services/auth");
 const { obtenerConfiguracion } = await import("../services/configuracion");
 
-/** Los seis accesos que dependen del rol, por el testid que usa también el E2E. */
+/** Los siete accesos que dependen del rol, por el testid que usa también el E2E. */
 const ACCESOS = [
   "acceso-registrar-movimiento",
   "acceso-historial",
   "acceso-productos",
   "acceso-transferir",
+  "acceso-proveedores",
   "acceso-escanear",
   "acceso-configuracion",
 ];
@@ -55,13 +56,13 @@ beforeEach(() => {
 });
 
 describe("Accesos según el rol", () => {
-  test("el propietario ve los seis", async () => {
+  test("el propietario ve los siete", async () => {
     renderizar();
 
     await waitFor(() => expect(visibles()).toEqual(ACCESOS));
   });
 
-  test("el gerente ve los seis: opera el negocio completo", async () => {
+  test("el gerente ve los siete: opera el negocio completo", async () => {
     obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
 
     renderizar();
@@ -83,6 +84,8 @@ describe("Accesos según el rol", () => {
         "acceso-historial",
         "acceso-productos",
         "acceso-transferir",
+        // Consulta el directorio (HU-19), aunque no lo administre.
+        "acceso-proveedores",
         "acceso-configuracion",
       ]),
     );
@@ -145,6 +148,7 @@ describe("El nombre accesible es el contrato", () => {
       "Historial de movimientos",
       "Productos",
       "Transferir stock",
+      "Proveedores",
       "Escanear producto",
       "Configuración",
     ]) {
