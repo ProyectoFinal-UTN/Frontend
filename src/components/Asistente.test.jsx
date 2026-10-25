@@ -144,6 +144,16 @@ describe("Abrir y cerrar", () => {
     ).toBeInTheDocument();
   });
 
+  test("la bienvenida propone en vez de dar órdenes", async () => {
+    await abrirPanel();
+
+    expect(screen.getByText(/Podés preguntarme sobre tu stock/)).toBeInTheDocument();
+    // `\p{L}` y no `\b`: para `\b` la "á" no es letra, y "Probá" no matchearía.
+    expect(
+      screen.queryByText(/(?<!\p{L})(Preguntame|Probá|Mirá|che)(?!\p{L})/u),
+    ).not.toBeInTheDocument();
+  });
+
   test("Escape cierra el panel y devuelve el foco al botón", async () => {
     const usuario = await abrirPanel();
 
