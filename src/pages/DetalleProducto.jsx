@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Campo from "../components/Campo";
 import CampoSelect from "../components/CampoSelect";
+import ProveedoresDelProducto from "../components/ProveedoresDelProducto";
 import { usePermisos } from "../hooks/usePermisos";
 import { obtenerProducto } from "../services/productos";
 import {
@@ -309,6 +310,18 @@ export default function DetalleProducto() {
                 Transferir entre ubicaciones →
               </Link>
             )}
+
+          {/*
+            A quién comprarle (HU-20). Espera a los permisos por lo mismo que el
+            link de arriba, y asociar exige `proveedor:update`: el empleado ve
+            la lista para saber a quién llamar, sin los botones.
+          */}
+          {resuelto && puede("proveedor", "read") && (
+            <ProveedoresDelProducto
+              productoId={id}
+              puedeEditar={puede("proveedor", "update")}
+            />
+          )}
         </>
       )}
     </main>

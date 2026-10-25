@@ -367,7 +367,8 @@ function Vacio() {
 }
 
 function Tarjeta({ recomendacion }) {
-  const { tipo, prioridad, producto, texto, porQue, datos } = recomendacion;
+  const { tipo, prioridad, producto, texto, porQue, datos, proveedoresSugeridos } =
+    recomendacion;
 
   const presentacion = PRESENTACION[tipo];
   // Un `prioridad` que el backend agregue mañana no tiene que dejar un badge
@@ -418,6 +419,35 @@ function Tarjeta({ recomendacion }) {
         <p className="mt-3 text-xs text-(--color-texto-apagado)">
           Categoría: {datos.categoria}
         </p>
+      )}
+
+      {/*
+        A quién pedirle (HU-20): los proveedores asociados al producto. Solo
+        viene en las de reposición, y vacío si el producto no tiene ninguno; en
+        ese caso no se dibuja nada. El teléfono va como link para llamar desde
+        el celular. Sin `<ul>`: la tarjeta ya es un `<li>` y los tests cuentan
+        las tarjetas por `listitem`.
+      */}
+      {proveedoresSugeridos?.length > 0 && (
+        <div className="mt-3 text-sm" data-testid="recomendacion-proveedores">
+          <p className="font-bold text-(--color-texto)">Se lo podés pedir a:</p>
+          {proveedoresSugeridos.map((proveedor) => (
+            <p key={proveedor.id} className="text-(--color-texto)">
+              {proveedor.nombre}
+              {proveedor.telefono && (
+                <>
+                  {" · "}
+                  <a
+                    href={`tel:${proveedor.telefono.replace(/[^\d+]/g, "")}`}
+                    className="text-(--color-primario) underline"
+                  >
+                    {proveedor.telefono}
+                  </a>
+                </>
+              )}
+            </p>
+          ))}
+        </div>
       )}
 
       {/*
