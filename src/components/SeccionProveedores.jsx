@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import AvisoDeError from "./AvisoDeError";
 import Campo from "./Campo";
+import ProductosDelProveedor from "./ProductosDelProveedor";
 import {
   crearProveedor,
   editarProveedor,
@@ -206,6 +207,9 @@ function FormularioProveedor({ modo, inicial, alGuardar, alCancelar, guardando }
  */
 function FilaProveedor({ proveedor, alEditar, alEliminar, guardando, puedeEditar }) {
   const [confirmando, setConfirmando] = useState(false);
+  // Los productos se piden recién al abrir el panel: con veinte proveedores en
+  // la lista serían veinte requests para mostrar algo que nadie pidió ver.
+  const [viendoProductos, setViendoProductos] = useState(false);
 
   if (confirmando) {
     return (
@@ -245,76 +249,96 @@ function FilaProveedor({ proveedor, alEditar, alEliminar, guardando, puedeEditar
     .join(" · ");
 
   return (
-    <li
-      className="flex flex-col gap-3 rounded-(--radius) border-2
-                 border-(--color-borde) px-4 py-3 sm:flex-row
-                 sm:items-center sm:justify-between"
-    >
-      <div className="min-w-0">
-        <p className="font-bold text-(--color-texto)">{proveedor.nombre}</p>
-        {comercial && (
-          <p className="text-sm text-(--color-texto-apagado)">{comercial}</p>
-        )}
-        {(proveedor.contacto || proveedor.telefono || proveedor.correo) && (
-          <p className="flex flex-wrap gap-x-3 text-sm text-(--color-texto-apagado)">
-            {proveedor.contacto && <span>{proveedor.contacto}</span>}
-            {/*
-              Links y no texto: desde el celular, tocar el teléfono llama y
-              tocar el correo abre el mail. Es para lo que se carga el dato.
-            */}
-            {proveedor.telefono && (
-              <a
-                href={`tel:${proveedor.telefono.replace(/[^\d+]/g, "")}`}
-                className="text-(--color-primario) underline"
+    <li className="rounded-(--radius) border-2 border-(--color-borde) px-4 py-3">
+      <div
+        className="flex flex-col gap-3 sm:flex-row sm:items-center
+                   sm:justify-between"
+      >
+        <div className="min-w-0">
+          <p className="font-bold text-(--color-texto)">{proveedor.nombre}</p>
+          {comercial && (
+            <p className="text-sm text-(--color-texto-apagado)">{comercial}</p>
+          )}
+          {(proveedor.contacto || proveedor.telefono || proveedor.correo) && (
+            <p className="flex flex-wrap gap-x-3 text-sm text-(--color-texto-apagado)">
+              {proveedor.contacto && <span>{proveedor.contacto}</span>}
+              {/*
+                Links y no texto: desde el celular, tocar el teléfono llama y
+                tocar el correo abre el mail. Es para lo que se carga el dato.
+              */}
+              {proveedor.telefono && (
+                <a
+                  href={`tel:${proveedor.telefono.replace(/[^\d+]/g, "")}`}
+                  className="text-(--color-primario) underline"
+                >
+                  {proveedor.telefono}
+                </a>
+              )}
+              {proveedor.correo && (
+                <a
+                  href={`mailto:${proveedor.correo}`}
+                  className="break-all text-(--color-primario) underline"
+                >
+                  {proveedor.correo}
+                </a>
+              )}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-1">
+          {/* Qué se le compra (HU-20). */}
+          <button
+            type="button"
+            onClick={() => setViendoProductos((abierto) => !abierto)}
+            aria-expanded={viendoProductos}
+            aria-label={`Productos de ${proveedor.nombre}`}
+            className={`${CLASES_BOTON_SUAVE} text-(--color-primario)`}
+          >
+            Productos
+          </button>
+          {/* El historial ya filtra por proveedor desde HU-14. */}
+          <Link
+            to={`/movimientos?proveedorId=${proveedor.id}`}
+            aria-label={`Ver compras a ${proveedor.nombre}`}
+            className={`${CLASES_BOTON_SUAVE} text-(--color-primario)`}
+          >
+            Ver compras
+          </Link>
+          {puedeEditar && (
+            <>
+              <button
+                type="button"
+                disabled={guardando}
+                onClick={() => alEditar(proveedor)}
+                aria-label={`Editar ${proveedor.nombre}`}
+                data-testid={`proveedor-editar-${proveedor.id}`}
+                className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
               >
-                {proveedor.telefono}
-              </a>
-            )}
-            {proveedor.correo && (
-              <a
-                href={`mailto:${proveedor.correo}`}
-                className="break-all text-(--color-primario) underline"
+                Editar
+              </button>
+              <button
+                type="button"
+                disabled={guardando}
+                onClick={() => setConfirmando(true)}
+                aria-label={`Eliminar ${proveedor.nombre}`}
+                data-testid={`proveedor-eliminar-${proveedor.id}`}
+                className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
               >
-                {proveedor.correo}
-              </a>
-            )}
-          </p>
-        )}
+                Eliminar
+              </button>
+            </>
+          )}
+        </div>
       </div>
-      <div className="flex shrink-0 gap-1">
-        {/* El historial ya filtra por proveedor desde HU-14. */}
-        <Link
-          to={`/movimientos?proveedorId=${proveedor.id}`}
-          aria-label={`Ver compras a ${proveedor.nombre}`}
-          className={`${CLASES_BOTON_SUAVE} text-(--color-primario)`}
-        >
-          Ver compras
-        </Link>
-        {puedeEditar && (
-          <>
-            <button
-              type="button"
-              disabled={guardando}
-              onClick={() => alEditar(proveedor)}
-              aria-label={`Editar ${proveedor.nombre}`}
-              data-testid={`proveedor-editar-${proveedor.id}`}
-              className={`${CLASES_BOTON_SUAVE} text-(--color-primario) disabled:opacity-60`}
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              disabled={guardando}
-              onClick={() => setConfirmando(true)}
-              aria-label={`Eliminar ${proveedor.nombre}`}
-              data-testid={`proveedor-eliminar-${proveedor.id}`}
-              className={`${CLASES_BOTON_SUAVE} text-(--color-peligro) disabled:opacity-60`}
-            >
-              Eliminar
-            </button>
-          </>
-        )}
-      </div>
+
+      {viendoProductos && (
+        <div className="mt-3 border-t-2 border-(--color-borde) pt-3">
+          <ProductosDelProveedor
+            proveedorId={proveedor.id}
+            puedeEditar={puedeEditar}
+          />
+        </div>
+      )}
     </li>
   );
 }
