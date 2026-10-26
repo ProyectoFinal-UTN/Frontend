@@ -317,8 +317,14 @@ function FilaProducto({
           {producto.categoria} · {producto.codigoBarras}
         </p>
         <p className="text-sm text-(--color-texto-apagado)">
-          Se mide en {producto.unidadMedida} · avisar bajo{" "}
-          {producto.umbralMinimo}
+          {/*
+            Mismo criterio que el detalle (HU-16): el umbral se cumple al
+            llegar a N, no por debajo, y un 0 es "sin umbral".
+          */}
+          Se mide en {producto.unidadMedida} ·{" "}
+          {producto.umbralMinimo === 0
+            ? "sin umbral"
+            : `avisar con ${producto.umbralMinimo} o menos`}
         </p>
       </div>
       <div className="flex shrink-0 gap-1">
