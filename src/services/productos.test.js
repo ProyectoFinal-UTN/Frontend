@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
+  actualizarUmbral,
   crearProducto,
   editarProducto,
+  obtenerUmbral,
   eliminarProducto,
   importarCatalogo,
   obtenerProducto,
@@ -135,6 +137,67 @@ describe("editarProducto", () => {
 
     await expect(editarProducto("p1", {})).rejects.toMatchObject({
       status: 404,
+    });
+  });
+});
+
+describe("obtenerUmbral (HU-16)", () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+  });
+
+  test("pide GET /productos/:id/umbral y devuelve la respuesta tal cual", async () => {
+    const respuesta = { productoId: "p1", umbralMinimo: 10 };
+    apiFetch.mockResolvedValueOnce(respuesta);
+
+    const resultado = await obtenerUmbral("p1");
+
+    expect(resultado).toEqual(respuesta);
+    expect(apiFetch).toHaveBeenCalledWith("/productos/p1/umbral");
+  });
+
+  test("relanza el 404 con su status", async () => {
+    const error = new Error("El producto no existe");
+    error.status = 404;
+    apiFetch.mockRejectedValueOnce(error);
+
+    await expect(obtenerUmbral("p1")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("actualizarUmbral (HU-16)", () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+  });
+
+  test("pone el umbral en PUT /productos/:id/umbral", async () => {
+    apiFetch.mockResolvedValueOnce({ productoId: "p1", umbralMinimo: 10 });
+
+    await actualizarUmbral("p1", 10);
+
+    expect(apiFetch).toHaveBeenCalledWith("/productos/p1/umbral", {
+      method: "PUT",
+      body: JSON.stringify({ umbralMinimo: 10 }),
+    });
+  });
+
+  test("manda el umbral como numero aunque llegue como texto", async () => {
+    apiFetch.mockResolvedValueOnce({});
+
+    await actualizarUmbral("p1", "7");
+
+    // El backend responde 400 a un `"7"`: tiene que viajar el número.
+    const enviado = JSON.parse(apiFetch.mock.calls[0][1].body);
+    expect(enviado.umbralMinimo).toBe(7);
+  });
+
+  test("relanza el 403 del empleado con su status", async () => {
+    const error = new Error("El rol no tiene permiso para esta accion");
+    error.status = 403;
+    apiFetch.mockRejectedValueOnce(error);
+
+    await expect(actualizarUmbral("p1", 5)).rejects.toMatchObject({
+      status: 403,
     });
   });
 });

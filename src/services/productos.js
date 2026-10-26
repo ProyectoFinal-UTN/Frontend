@@ -71,6 +71,33 @@ export function editarProducto(id, datos) {
 }
 
 /**
+ * El umbral mínimo de reposición de un producto (HU-16):
+ * `{ productoId, umbralMinimo }`. Un `0` significa "sin umbral configurado".
+ *
+ * Responde 404 si el producto no existe, fue dado de baja o es de otro
+ * comercio: el backend no los distingue a propósito.
+ */
+export function obtenerUmbral(id) {
+  return apiFetch(`/productos/${id}/umbral`);
+}
+
+/**
+ * Cambia solo el umbral mínimo de un producto (HU-16); el resto de la ficha
+ * se edita con `editarProducto`.
+ *
+ * El `Number()` va acá y no en quien llama por el mismo motivo que en el alta:
+ * el backend rechaza con 400 un `"10"`, y el `value` de un input es siempre
+ * string. Responde 403 para el empleado, que puede ver el umbral pero no
+ * cambiarlo.
+ */
+export function actualizarUmbral(id, umbralMinimo) {
+  return apiFetch(`/productos/${id}/umbral`, {
+    method: "PUT",
+    body: JSON.stringify({ umbralMinimo: Number(umbralMinimo) }),
+  });
+}
+
+/**
  * Baja lógica: el producto deja de aparecer en el catálogo pero su historial
  * de movimientos se conserva.
  *
