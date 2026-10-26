@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Campo from "../components/Campo";
 import CampoSelect from "../components/CampoSelect";
+import UmbralReposicion from "../components/UmbralReposicion";
 import { usePermisos } from "../hooks/usePermisos";
 import { obtenerProducto } from "../services/productos";
 import {
@@ -249,6 +250,16 @@ export default function DetalleProducto() {
 
       {!cargando && !error && producto && (
         <>
+          {/*
+            Arriba del stock para que el umbral y la cantidad se lean juntos
+            (HU-16). El empleado lo ve pero no lo cambia: el PUT pide
+            `producto:update`.
+          */}
+          <UmbralReposicion
+            productoId={id}
+            puedeEditar={resuelto && puede("producto", "update")}
+          />
+
           {producto.stock.porUbicacion.length === 0 ? (
             <div className="rounded-(--radius) bg-(--color-apagado) px-4 py-8 text-center">
               <p className="font-bold text-(--color-texto)">
