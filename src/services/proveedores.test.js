@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
+  asociarProveedor,
   crearProveedor,
+  desasociarProveedor,
   editarProveedor,
   eliminarProveedor,
+  obtenerProductosDeProveedor,
   obtenerProveedores,
+  obtenerProveedoresDeProducto,
 } from "./proveedores";
 import { apiFetch } from "./api";
 
@@ -50,6 +54,43 @@ describe("proveedores", () => {
     await eliminarProveedor("v1");
 
     expect(apiFetch).toHaveBeenCalledWith("/proveedores/v1", { method: "DELETE" });
+  });
+
+  test("obtenerProveedoresDeProducto pide GET /productos/:id/proveedores", async () => {
+    apiFetch.mockResolvedValueOnce([]);
+
+    await obtenerProveedoresDeProducto("p1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/productos/p1/proveedores");
+  });
+
+  test("obtenerProductosDeProveedor pide GET /proveedores/:id/productos", async () => {
+    apiFetch.mockResolvedValueOnce([]);
+
+    await obtenerProductosDeProveedor("v1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/proveedores/v1/productos");
+  });
+
+  test("asociarProveedor hace POST sobre el producto con el proveedor en el cuerpo", async () => {
+    apiFetch.mockResolvedValueOnce({});
+
+    await asociarProveedor("p1", "v1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/productos/p1/proveedores", {
+      method: "POST",
+      body: JSON.stringify({ proveedorId: "v1" }),
+    });
+  });
+
+  test("desasociarProveedor hace DELETE sobre el vínculo", async () => {
+    apiFetch.mockResolvedValueOnce(null);
+
+    await desasociarProveedor("p1", "v1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/productos/p1/proveedores/v1", {
+      method: "DELETE",
+    });
   });
 
   test("los errores del backend llegan a quien llama, con su status", async () => {

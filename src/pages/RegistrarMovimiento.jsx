@@ -12,6 +12,10 @@ import {
   registrarMovimiento,
 } from "../services/movimientos";
 import { obtenerProductos } from "../services/productos";
+import {
+  obtenerProveedores,
+  obtenerProveedoresDeProducto,
+} from "../services/proveedores";
 import { validarMovimiento } from "./RegistrarMovimiento.validacion";
 
 /**
@@ -39,6 +43,7 @@ const CAMPOS_VACIOS = {
   tipo: "",
   sentido: "",
   motivo: "",
+  proveedorId: "",
   cantidad: "",
   ubicacionId: "",
 };
@@ -85,8 +90,17 @@ function mensajeConfirmacion({ producto, ubicacion, cantidad }) {
     : `Listo. ${sujeto} quedó con ${unidades}.`;
 }
 
-function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
+function FormularioMovimiento({
+  productos,
+  ubicaciones,
+  proveedores = [],
+  alRecargar,
+}) {
   const [campos, setCampos] = useState(CAMPOS_VACIOS);
+  // Los proveedores asociados al producto elegido (HU-20), para ofrecerlos
+  // primero en una compra. Se guarda de qué producto son: si la respuesta de
+  // un producto anterior llega tarde, no se mezcla con la del actual.
+  const [asociados, setAsociados] = useState({ productoId: "", ids: [] });
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState("");
   const [avisoStock, setAvisoStock] = useState("");
@@ -116,7 +130,37 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
     ...campos,
     productoId: idVigente(productos, campos.productoId),
     ubicacionId: idVigente(ubicaciones, campos.ubicacionId),
+    proveedorId: idVigente(proveedores, campos.proveedorId),
   };
+
+  // El proveedor solo existe en una compra (HU-20), y solo si el comercio tiene
+  // alguno cargado: no se le muestra a nadie un desplegable sin opciones. Es
+  // opcional, así que no agrega pasos al flujo más usado (RNF1).
+  const pideProveedor = seleccion.tipo === "compra" && proveedores.length > 0;
+  const productoDeLaCompra = pideProveedor ? seleccion.productoId : "";
+
+  useEffect(() => {
+    if (!productoDeLaCompra) return;
+
+    let vigente = true;
+    // Si falla, la compra se registra igual: el proveedor es opcional y la
+    // lista completa ya está cargada; solo se pierde el orden de sugeridos.
+    obtenerProveedoresDeProducto(productoDeLaCompra)
+      .then((lista) => lista.map((proveedor) => proveedor.id))
+      .catch(() => [])
+      .then((ids) => {
+        if (vigente) setAsociados({ productoId: productoDeLaCompra, ids });
+      });
+
+    return () => {
+      vigente = false;
+    };
+  }, [productoDeLaCompra]);
+
+  const idsSugeridos =
+    asociados.productoId === productoDeLaCompra ? new Set(asociados.ids) : new Set();
+  const sugeridos = proveedores.filter((proveedor) => idsSugeridos.has(proveedor.id));
+  const otros = proveedores.filter((proveedor) => !idsSugeridos.has(proveedor.id));
 
   function alEscribir(evento) {
     const { name, value } = evento.target;
@@ -134,6 +178,8 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
       ...(name === "tipo" && !TIPOS_QUE_EXIGEN_MOTIVO.includes(value)
         ? { motivo: "" }
         : {}),
+      // Y con el proveedor: una venta no se le atribuye a quien nos vendió.
+      ...(name === "tipo" && value !== "compra" ? { proveedorId: "" } : {}),
     }));
 
     // El error se limpia apenas tocan el campo: dejarlo mientras corrigen es
@@ -184,6 +230,11 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
 
     if (pideUbicacion) {
       datos.ubicacionId = seleccion.ubicacionId;
+    }
+
+    // Opcional: sin elegir, la compra viaja sin proveedor, como antes de HU-20.
+    if (pideProveedor && seleccion.proveedorId) {
+      datos.proveedorId = seleccion.proveedorId;
     }
 
     // El `try` envuelve solo el pedido. Todo lo que sigue corre con el
@@ -465,6 +516,50 @@ function FormularioMovimiento({ productos, ubicaciones, alRecargar }) {
         </CampoSelect>
       )}
 
+      {/*
+        A quién se le compró (HU-20). Va después de la ubicación porque es
+        opcional: lo obligatorio queda arriba, y quien no lo necesita confirma
+        sin pasar por acá. Los proveedores del producto elegido van primero;
+        no se preselecciona ninguno, porque una compra atribuida al proveedor
+        equivocado queda así en el libro, que no se corrige.
+      */}
+      {pideProveedor && (
+        <CampoSelect
+          id="proveedorId"
+          etiqueta="Proveedor (opcional)"
+          value={seleccion.proveedorId}
+          onChange={alEscribir}
+        >
+          <option value="">Sin indicar</option>
+          {sugeridos.length > 0 ? (
+            <>
+              <optgroup label="Le comprás este producto a">
+                {sugeridos.map((proveedor) => (
+                  <option key={proveedor.id} value={proveedor.id}>
+                    {proveedor.nombre}
+                  </option>
+                ))}
+              </optgroup>
+              {otros.length > 0 && (
+                <optgroup label="Otros proveedores">
+                  {otros.map((proveedor) => (
+                    <option key={proveedor.id} value={proveedor.id}>
+                      {proveedor.nombre}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </>
+          ) : (
+            proveedores.map((proveedor) => (
+              <option key={proveedor.id} value={proveedor.id}>
+                {proveedor.nombre}
+              </option>
+            ))
+          )}
+        </CampoSelect>
+      )}
+
       <button
         type="submit"
         disabled={guardando || refrescando}
@@ -507,12 +602,20 @@ export default function RegistrarMovimiento() {
   // Se devuelve `{ ok, error }` y no un booleano para no perder el mensaje del
   // backend: un 401 por sesión vencida y un 500 necesitan decir cosas
   // distintas, y `apiFetch` ya los trae redactados para un comerciante.
+  //
+  // Los proveedores (HU-20) viajan en paralelo con los otros dos, pero su fallo
+  // se traga: sin ellos la compra se registra igual, sin proveedor, y tirar el
+  // formulario entero por un dato opcional sería castigar el flujo más usado.
   const cargar = useCallback(
     ({ conservarFormulario = false } = {}) =>
-      Promise.all([obtenerProductos(), obtenerUbicaciones()])
-        .then(([productos, ubicaciones]) => {
+      Promise.all([
+        obtenerProductos(),
+        obtenerUbicaciones(),
+        obtenerProveedores().catch(() => []),
+      ])
+        .then(([productos, ubicaciones, proveedores]) => {
           if (!montado.current) return { ok: false, error: "" };
-          setDatos({ productos, ubicaciones });
+          setDatos({ productos, ubicaciones, proveedores });
           setError("");
           return { ok: true, error: "" };
         })
@@ -598,6 +701,7 @@ export default function RegistrarMovimiento() {
           {datos.productos.length > 0 && datos.ubicaciones.length > 0 && (
             <FormularioMovimiento
               productos={datos.productos}
+              proveedores={datos.proveedores}
               ubicaciones={datos.ubicaciones}
               alRecargar={cargar}
             />

@@ -10,11 +10,20 @@ vi.mock("../services/proveedores", async (original) => ({
   crearProveedor: vi.fn(),
   editarProveedor: vi.fn(),
   eliminarProveedor: vi.fn(),
+  obtenerProductosDeProveedor: vi.fn(async () => []),
 }));
 
-const { crearProveedor, editarProveedor, eliminarProveedor } = await import(
-  "../services/proveedores"
-);
+// El panel de productos (HU-20) pide el catálogo para su desplegable.
+vi.mock("../services/productos", () => ({
+  obtenerProductos: vi.fn(async () => []),
+}));
+
+const {
+  crearProveedor,
+  editarProveedor,
+  eliminarProveedor,
+  obtenerProductosDeProveedor,
+} = await import("../services/proveedores");
 
 const alRecargar = vi.fn();
 
@@ -127,6 +136,38 @@ describe("Listado", () => {
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
     await abrirAlta(usuario);
     expect(screen.getByRole("form", { name: "Nuevo proveedor" })).toBeInTheDocument();
+  });
+});
+
+describe("Productos de cada proveedor (HU-20)", () => {
+  test("se piden recién al abrir el panel, y se cierran con el mismo botón", async () => {
+    const usuario = userEvent.setup();
+    obtenerProductosDeProveedor.mockResolvedValue([{ id: "p1", nombre: "Yerba 1kg" }]);
+    renderizar();
+
+    const boton = screen.getByRole("button", { name: "Productos de Distribuidora Sur" });
+    expect(boton).toHaveAttribute("aria-expanded", "false");
+    expect(obtenerProductosDeProveedor).not.toHaveBeenCalled();
+
+    await usuario.click(boton);
+
+    expect(boton).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByRole("link", { name: "Yerba 1kg" })).toBeInTheDocument();
+    expect(obtenerProductosDeProveedor).toHaveBeenCalledWith("v1");
+
+    await usuario.click(boton);
+    expect(screen.queryByRole("link", { name: "Yerba 1kg" })).not.toBeInTheDocument();
+  });
+
+  test("el empleado también los consulta, sin poder quitar", async () => {
+    const usuario = userEvent.setup();
+    obtenerProductosDeProveedor.mockResolvedValue([{ id: "p1", nombre: "Yerba 1kg" }]);
+    renderizar({ puedeEditar: false });
+
+    await usuario.click(screen.getByRole("button", { name: "Productos de Distribuidora Sur" }));
+
+    expect(await screen.findByRole("link", { name: "Yerba 1kg" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^quitar/i })).not.toBeInTheDocument();
   });
 });
 

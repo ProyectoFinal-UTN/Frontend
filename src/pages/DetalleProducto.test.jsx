@@ -22,6 +22,16 @@ vi.mock("../services/configuracion", async (original) => ({
   obtenerConfiguracion: vi.fn(),
 }));
 
+// La sección de proveedores (HU-20) pide sus datos por su cuenta. Acá se mockea
+// vacía para que el detalle no salga a la red; su comportamiento se prueba en
+// components/ProveedoresDelProducto.test.jsx.
+vi.mock("../services/proveedores", () => ({
+  obtenerProveedores: vi.fn(async () => []),
+  obtenerProveedoresDeProducto: vi.fn(async () => []),
+  asociarProveedor: vi.fn(),
+  desasociarProveedor: vi.fn(),
+}));
+
 function renderizar(id = "p1") {
   return render(
     <MemoryRouter initialEntries={[`/productos/${id}`]}>

@@ -324,11 +324,16 @@ function PanelDelAsistente() {
 function Bienvenida({ alElegir, deshabilitado }) {
   return (
     <div className="text-sm text-(--color-texto)">
+      {/*
+        Sin imperativos («Preguntame», «Probá con»), igual que lo que redacta el
+        modelo: el asistente propone, no da órdenes (ver asistente.tono.js en
+        el Backend).
+      */}
       <p>
-        Preguntame sobre tu stock y tus movimientos, como se lo preguntarías a
-        alguien del negocio.
+        Podés preguntarme sobre tu stock y tus movimientos, como se lo
+        preguntarías a alguien del negocio.
       </p>
-      <p className="mt-3 font-semibold">Probá con:</p>
+      <p className="mt-3 font-semibold">Algunas preguntas para empezar:</p>
       <ul className="mt-2 flex flex-col gap-2">
         {SUGERENCIAS.map((sugerencia) => (
           <li key={sugerencia}>
