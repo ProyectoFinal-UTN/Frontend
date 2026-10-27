@@ -19,10 +19,13 @@ vi.mock("../services/datosPersonales", () => ({
 
 vi.mock("../services/auth", () => ({ refrescarSesion: vi.fn() }));
 
+vi.mock("../services/pushNavegador", () => ({ desuscribirAlSalir: vi.fn() }));
+
 const { obtenerMisDatos, darDeBajaCuenta, descargarMisDatos } = await import(
   "../services/datosPersonales"
 );
 const { refrescarSesion } = await import("../services/auth");
+const { desuscribirAlSalir } = await import("../services/pushNavegador");
 
 const MIS_DATOS = {
   cuenta: { correo: "ana@kiosco.com", nombre: "ana" },
@@ -120,6 +123,8 @@ describe("Derecho de supresión", () => {
     // hay usuario y la pantalla siguiente entraría con una cuenta borrada.
     expect(refrescarSesion).toHaveBeenCalled();
     expect(navegar).toHaveBeenCalledWith("/login", { replace: true });
+    // Que el dispositivo no siga recibiendo avisos de una cuenta borrada (HU-18).
+    expect(desuscribirAlSalir).toHaveBeenCalled();
   });
 
   test("muestra el motivo cuando el backend la rechaza, y no navega", async () => {
@@ -139,6 +144,8 @@ describe("Derecho de supresión", () => {
       "Sos el único propietario",
     );
     expect(navegar).not.toHaveBeenCalled();
+    // La cuenta sigue existiendo: sus avisos también.
+    expect(desuscribirAlSalir).not.toHaveBeenCalled();
   });
 
   test("cancelar cierra la confirmación sin llamar al backend", async () => {
