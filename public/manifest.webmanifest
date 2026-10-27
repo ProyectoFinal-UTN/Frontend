@@ -1,0 +1,25 @@
+{
+  "name": "Gestión Comercial PyME",
+  "short_name": "Gestión PyME",
+  "description": "Stock, movimientos y avisos de reposición de tu comercio.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9f6f0",
+  "theme_color": "#2666a2",
+  "icons": [
+    {
+      "src": "/iconos/app-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/iconos/app-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
