@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import AperturasDesdeAvisos from "./components/AperturasDesdeAvisos";
 import Asistente from "./components/Asistente";
 import Layout from "./components/Layout";
 import RutaProtegida from "./components/RutaProtegida";
@@ -150,6 +151,11 @@ export default function App() {
         sesión iniciada; eso lo decide el propio componente.
       */}
       <Asistente />
+      {/*
+        También fuera de <Routes> (HU-18): tocar un aviso de reposición con la
+        app abierta lleva al producto desde cualquier pantalla.
+      */}
+      <AperturasDesdeAvisos />
     </BrowserRouter>
   );
 }

@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Navegacion from "./Navegacion";
 import { useAuth } from "../hooks/useAuth";
+import { useSincronizarPush } from "../hooks/useSincronizarPush";
 
 /**
  * Estructura común de las pantallas con sesión: navegación + contenido.
@@ -18,6 +19,16 @@ import { useAuth } from "../hooks/useAuth";
  * guardado en el store compartido de HU-32 (el mismo motivo por el que
  * `Asistente` está partido en dos).
  */
+/**
+ * Reenvía la suscripción push al entrar (HU-18). Es un componente aparte y no
+ * un hook suelto en `Layout` porque pregunta permisos, y eso solo puede pasar
+ * con sesión —ver arriba—.
+ */
+function SincronizarPush() {
+  useSincronizarPush();
+  return null;
+}
+
 export default function Layout() {
   const { autenticado } = useAuth();
 
@@ -27,6 +38,7 @@ export default function Layout() {
 
   return (
     <div className="lg:flex lg:items-start">
+      <SincronizarPush />
       <Navegacion />
       {/*
         Espacio para lo que flota encima del contenido, para que nunca tape un
