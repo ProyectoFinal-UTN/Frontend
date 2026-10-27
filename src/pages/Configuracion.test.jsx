@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Configuracion from "./Configuracion";
-import { configuracionDe } from "../tests/permisos";
+import { PERMISOS, configuracionDe } from "../tests/permisos";
 
 vi.mock("../services/configuracion", async (original) => ({
   ...(await original()),
@@ -72,7 +72,7 @@ beforeEach(() => {
 });
 
 describe("Armazón de la pantalla", () => {
-  test("muestra las cuatro secciones del prototipo, más Mis datos", async () => {
+  test("muestra las cuatro secciones del prototipo, más Notificaciones y Mis datos", async () => {
     renderizar();
 
     const pestanas = await screen.findAllByRole("tab");
@@ -82,8 +82,10 @@ describe("Armazón de la pantalla", () => {
       "Ubicaciones y moneda",
       "Usuarios y roles",
       "Auditoría",
-      // Esta no estaba en el prototipo. Va última porque no es del comercio
-      // sino de la persona (HU-31).
+      // Estas dos no estaban en el prototipo. Van al final porque no son del
+      // comercio: una es de este dispositivo (HU-18) y otra de la persona
+      // (HU-31).
+      "Notificaciones",
       "Mis datos",
     ]);
   });
@@ -129,6 +131,7 @@ describe("Armazón de la pantalla", () => {
       "Ubicaciones y moneda",
       "Usuarios y roles",
       "Auditoría",
+      "Notificaciones",
       "Mis datos",
     ]) {
       await usuario.click(await screen.findByRole("tab", { name: etiqueta }));
@@ -196,6 +199,18 @@ describe("Carga de datos", () => {
 
     expect(
       await screen.findByRole("button", { name: /descargar mis datos/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  test("Notificaciones se abre aunque falle la carga del comercio", async () => {
+    // Activarlas es algo de este dispositivo: no depende del negocio (HU-18).
+    obtenerPerfil.mockRejectedValue(new Error("El comercio no existe"));
+
+    renderizar("/configuracion?seccion=notificaciones");
+
+    expect(
+      await screen.findByRole("switch", { name: /notificaciones push/i }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -267,7 +282,7 @@ describe("Control de acceso por rol (HU-32)", () => {
     return screen.getAllByRole("tab").map((p) => p.textContent);
   }
 
-  test("el propietario ve las cinco secciones", async () => {
+  test("el propietario ve las seis secciones", async () => {
     obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
 
     renderizar();
@@ -277,6 +292,7 @@ describe("Control de acceso por rol (HU-32)", () => {
       "Ubicaciones y moneda",
       "Usuarios y roles",
       "Auditoría",
+      "Notificaciones",
       "Mis datos",
     ];
     expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
@@ -293,6 +309,7 @@ describe("Control de acceso por rol (HU-32)", () => {
       "Perfil del comercio",
       "Ubicaciones y moneda",
       "Usuarios y roles",
+      "Notificaciones",
       "Mis datos",
     ];
     expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
@@ -325,6 +342,7 @@ describe("Control de acceso por rol (HU-32)", () => {
     const esperadas = [
       "Perfil del comercio",
       "Ubicaciones y moneda",
+      "Notificaciones",
       "Mis datos",
     ];
     expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
@@ -381,12 +399,50 @@ describe("Control de acceso por rol (HU-32)", () => {
   // Si averiguar los permisos falla, esconder pestañas le sacaría secciones a
   // quien sí podía usarlas. Cada sección pide sus datos igual y el backend
   // corta con un 403 si de verdad no corresponde.
+  /** Los del empleado sin `alerta`, como quedaría un rol que la pierda. */
+  function permisosSinAlertas() {
+    return Object.fromEntries(
+      Object.entries(PERMISOS.empleado).filter(([recurso]) => recurso !== "alerta"),
+    );
+  }
+
+  // Hoy los tres roles tienen `alerta:read`. Si un rol lo pierde, las rutas de
+  // push le responden 403: la pestaña no se ofrece (HU-18).
+  test("un rol sin alerta:read no ve Notificaciones", async () => {
+    obtenerConfiguracion.mockResolvedValue(
+      configuracionDe("empleado", { permisos: permisosSinAlertas() }),
+    );
+
+    renderizar();
+
+    const esperadas = [
+      "Perfil del comercio",
+      "Ubicaciones y moneda",
+      "Mis datos",
+    ];
+    expect(await pestanasVisibles(esperadas)).toEqual(esperadas);
+    expect(
+      screen.queryByTestId("pestana-notificaciones"),
+    ).not.toBeInTheDocument();
+  });
+
+  test("tampoco llega por URL: cae en Perfil", async () => {
+    obtenerConfiguracion.mockResolvedValue(
+      configuracionDe("empleado", { permisos: permisosSinAlertas() }),
+    );
+
+    renderizar("/configuracion?seccion=notificaciones");
+
+    expect(await screen.findByLabelText(/nombre del negocio/i)).toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
   test("si no se pudo saber el rol, se muestran todas", async () => {
     obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
 
     renderizar();
 
-    expect(await screen.findAllByRole("tab")).toHaveLength(5);
+    expect(await screen.findAllByRole("tab")).toHaveLength(6);
   });
 });
 
