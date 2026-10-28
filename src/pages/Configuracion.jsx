@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
 import SeccionAuditoria from "../components/SeccionAuditoria";
 import SeccionMiCuenta from "../components/SeccionMiCuenta";
+import SeccionNotificaciones from "../components/SeccionNotificaciones";
 import SeccionPerfil from "../components/SeccionPerfil";
 import SeccionUbicaciones from "../components/SeccionUbicaciones";
 import SeccionUsuarios from "../components/SeccionUsuarios";
@@ -20,6 +21,9 @@ import { obtenerPerfil } from "../services/comercio";
  * separada de las otras a propósito: las cuatro primeras son del comercio y
  * dependen del rol, y esa es de la persona —los mismos derechos para todos,
  * incluido el empleado—.
+ *
+ * "Notificaciones" (HU-18) va justo antes, y por lo mismo tampoco depende de la
+ * carga del comercio: activarlas es algo de este dispositivo, no del negocio.
  *
  * Las pestañas que el rol no puede usar no se muestran (HU-32). Se ocultan y no
  * se deshabilitan: una pestaña gris le anuncia al empleado que existe una
@@ -43,10 +47,19 @@ const SECCIONES = [
     requiere: ["member", "read"],
   },
   { id: "auditoria", etiqueta: "Auditoría", requiere: ["auditoria", "read"] },
+  // Las rutas de push piden `alerta:read`: sin él, todo terminaría en 403.
+  {
+    id: "notificaciones",
+    etiqueta: "Notificaciones",
+    requiere: ["alerta", "read"],
+  },
   { id: "mis-datos", etiqueta: "Mis datos" },
 ];
 
 const SECCION_POR_DEFECTO = "perfil";
+
+/** Las que no son del comercio: no esperan su carga ni dependen de que salga. */
+const SECCIONES_PERSONALES = ["notificaciones", "mis-datos"];
 
 export default function Configuracion() {
   const [parametros, setParametros] = useSearchParams();
@@ -90,6 +103,7 @@ export default function Configuracion() {
   const activa = visibles.some((s) => s.id === pedida)
     ? pedida
     : SECCION_POR_DEFECTO;
+  const delComercio = !SECCIONES_PERSONALES.includes(activa);
 
   // La recarga que dispara la sección hija puede volver después de que la
   // pantalla se desmontó. El ref lo comparten la carga inicial y las recargas,
@@ -176,11 +190,14 @@ export default function Configuracion() {
         */}
         {activa === "mis-datos" && <SeccionMiCuenta />}
 
-        {activa !== "mis-datos" && cargando && (
+        {/* Lo mismo para las notificaciones: son de este dispositivo. */}
+        {activa === "notificaciones" && <SeccionNotificaciones />}
+
+        {delComercio && cargando && (
           <p className="text-(--color-texto-apagado)">Cargando datos…</p>
         )}
 
-        {activa !== "mis-datos" && !cargando && error && (
+        {delComercio && !cargando && error && (
           <p
             role="alert"
             className="rounded-(--radius) bg-(--color-peligro-suave) px-4 py-3
@@ -190,7 +207,7 @@ export default function Configuracion() {
           </p>
         )}
 
-        {activa !== "mis-datos" && !cargando && !error && configuracion && perfil && (
+        {delComercio && !cargando && !error && configuracion && perfil && (
           <>
             {activa === "perfil" && (
               // Sin `key`, a propósito. Antes había uno atado a `perfil.nombre`

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 
 /**
@@ -116,5 +116,78 @@ describe("registrar", () => {
 
     expect(llamadas.some((r) => r.includes("sign-up"))).toBe(true);
     expect(llamadas.some((r) => r.includes("get-session"))).toBe(true);
+  });
+});
+
+describe("cerrarSesion", () => {
+  /**
+   * Un navegador con una suscripción push activa (HU-18). Se usan los services
+   * reales —`pushNavegador`, `push`, `api.js`— para ver el pedido que sale de
+   * verdad y en qué orden respecto del de Better Auth.
+   */
+  function conSuscripcionPush() {
+    const suscripcion = {
+      endpoint: "https://fcm.googleapis.com/fcm/send/abc",
+      unsubscribe: vi.fn(async () => true),
+    };
+    const registro = {
+      pushManager: { getSubscription: vi.fn(async () => suscripcion) },
+    };
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { getRegistration: vi.fn(async () => registro) },
+    });
+    vi.stubGlobal("PushManager", function PushManager() {});
+    vi.stubGlobal("Notification", { permission: "granted" });
+    return suscripcion;
+  }
+
+  afterEach(() => {
+    delete navigator.serviceWorker;
+    vi.unstubAllGlobals();
+  });
+
+  test("borra la suscripción push ANTES de cerrar la sesión", async () => {
+    // Después ya no se podría: el DELETE necesita la sesión viva.
+    const suscripcion = conSuscripcionPush();
+    const llamadas = [];
+    vi.stubGlobal("fetch", fetchSimulado(llamadas));
+
+    const { cerrarSesion } = await import("./auth");
+    await cerrarSesion();
+
+    const borrar = llamadas.findIndex((r) => r.includes("/push/suscripciones"));
+    const salir = llamadas.findIndex((r) => r.includes("sign-out"));
+    expect(borrar).toBeGreaterThanOrEqual(0);
+    expect(borrar).toBeLessThan(salir);
+    expect(suscripcion.unsubscribe).toHaveBeenCalled();
+  });
+
+  test("si borrar la suscripción falla, el logout sigue igual", async () => {
+    const suscripcion = conSuscripcionPush();
+    const llamadas = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) => {
+        llamadas.push(String(url));
+        const esPush = String(url).includes("/push/");
+
+        return new Response(
+          JSON.stringify(esPush ? { error: "Se cayó" } : SESION),
+          {
+            status: esPush ? 500 : 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const { cerrarSesion } = await import("./auth");
+    const resultado = await cerrarSesion();
+
+    expect(resultado.ok).toBe(true);
+    expect(llamadas.some((r) => r.includes("sign-out"))).toBe(true);
+    // Desuscribir el navegador es lo que corta los avisos: se hace igual.
+    expect(suscripcion.unsubscribe).toHaveBeenCalled();
   });
 });

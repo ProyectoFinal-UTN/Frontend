@@ -6,6 +6,7 @@ import {
   obtenerMisDatos,
 } from "../services/datosPersonales";
 import { refrescarSesion } from "../services/auth";
+import { desuscribirAlSalir } from "../services/pushNavegador";
 
 /**
  * Datos personales de quien está usando la app (HU-31, Ley 25.326).
@@ -63,6 +64,11 @@ export default function SeccionMiCuenta() {
       setDandoDeBaja(false);
       return;
     }
+
+    // Que este dispositivo deje de recibir avisos de una cuenta que ya no
+    // existe (HU-18). El backend ya borró sus suscripciones junto con el
+    // usuario; esto suelta la del navegador. Nunca falla.
+    await desuscribirAlSalir();
 
     // El backend ya borró las sesiones, pero el store de Better Auth todavía
     // cree que hay usuario. Sin este refresco, la pantalla siguiente entraría

@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Para que la app se pueda instalar (HU-18). En iPhone las notificaciones
+      push solo funcionan con la app agregada a la pantalla de inicio, y iOS la
+      trata como app recién cuando encuentra el manifest.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2666a2" />
+    <link rel="apple-touch-icon" href="/iconos/app-180.png" />
+    <meta name="apple-mobile-web-app-title" content="Gestión PyME" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

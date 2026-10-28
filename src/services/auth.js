@@ -1,5 +1,6 @@
 import { createAuthClient } from "better-auth/react";
 import { olvidarPermisos } from "./permisos";
+import { desuscribirAlSalir } from "./pushNavegador";
 
 /**
  * Autenticación: única puerta entre las páginas y Better Auth.
@@ -190,6 +191,12 @@ export async function restablecerPassword({ token, password }) {
 
 /** Cierra la sesión activa. */
 export async function cerrarSesion() {
+  // Antes del signOut, porque borrar la suscripción en el backend necesita la
+  // sesión viva. Sin esto, quien entre después en este dispositivo recibiría
+  // los avisos de reposición del anterior (HU-18). Nunca falla: si no sale,
+  // el logout sigue igual.
+  await desuscribirAlSalir();
+
   const { error } = await cliente.signOut();
 
   if (error) {

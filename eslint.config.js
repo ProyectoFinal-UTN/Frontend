@@ -19,6 +19,13 @@ export default defineConfig([
     },
   },
   {
+    // El service worker corre en su propio contexto (HU-18), no en la página.
+    files: ['public/sw.js'],
+    languageOptions: {
+      globals: globals.serviceworker,
+    },
+  },
+  {
     // Corre en Node (config de build), no en el navegador — necesita `process`.
     files: ['vite.config.js'],
     languageOptions: {
