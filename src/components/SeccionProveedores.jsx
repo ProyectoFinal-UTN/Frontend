@@ -296,9 +296,13 @@ function FilaProveedor({ proveedor, alEditar, alEliminar, guardando, puedeEditar
           >
             Productos
           </button>
-          {/* El historial ya filtra por proveedor desde HU-14. */}
+          {/*
+            Su historial de compras, con el resumen del período (HU-21). Antes
+            iba al historial general filtrado por proveedor, que mezcla todos
+            los tipos de movimiento y no resume nada.
+          */}
           <Link
-            to={`/movimientos?proveedorId=${proveedor.id}`}
+            to={`/proveedores/${proveedor.id}/compras`}
             aria-label={`Ver compras a ${proveedor.nombre}`}
             className={`${CLASES_BOTON_SUAVE} text-(--color-primario)`}
           >
