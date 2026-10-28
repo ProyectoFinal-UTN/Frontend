@@ -200,9 +200,20 @@ export default function HistorialComprasProveedor() {
   const filtros = leerFiltros(parametros);
   const rangoInvalido = errorDeRango(filtros);
 
-  const [resultado, setResultado] = useState(null);
-  const [error, setError] = useState(null);
-  const [cargando, setCargando] = useState(true);
+  // La respuesta se guarda junto al proveedor y a la consulta de la que salió.
+  // Guardar esas dos marcas es lo que deja derivar todo lo demás, sin un estado
+  // de "cargando" que haya que acordarse de prender en cada botón.
+  const [carga, setCarga] = useState({
+    id: null,
+    clave: null,
+    resultado: null,
+    error: null,
+  });
+
+  // Reintentar es pedir la misma consulta de nuevo. Como un contador y no como
+  // una llamada suelta, para que la pantalla se entere de que hay algo en vuelo
+  // igual que con cualquier otro cambio.
+  const [intento, setIntento] = useState(0);
 
   // Cada consulta lleva un número. Si se cambian dos filtros seguidos, la
   // respuesta de la primera puede llegar después que la de la segunda y pisar
@@ -220,6 +231,24 @@ export default function HistorialComprasProveedor() {
 
   const consulta = parametros.toString();
 
+  // Lo que la pantalla está pidiendo ahora mismo. Comparado con la marca de lo
+  // último que volvió, dice si hay algo en vuelo: así un cambio de URL que no
+  // pasa por los controles —el botón atrás del navegador, un link de un
+  // proveedor a otro— también avisa, en vez de dejar los datos anteriores a la
+  // vista como si ya fueran los nuevos.
+  const clave = `${id}|${consulta}|${intento}`;
+
+  // Un resultado de otro proveedor quedó viejo en cuanto cambió la URL: se
+  // descarta en el mismo render, sin esperar a que vuelva la consulta nueva.
+  // Si no, el nombre, el badge y el resumen del anterior se leerían como suyos.
+  const esDeEsteProveedor = carga.id === id;
+  const resultado = esDeEsteProveedor ? carga.resultado : null;
+  const error = esDeEsteProveedor ? carga.error : null;
+
+  // Con el rango al revés no se consulta —el aviso ya está al lado de las
+  // fechas—, así que no hay nada que esperar.
+  const cargando = !rangoInvalido && carga.clave !== clave;
+
   const cargar = useCallback(() => {
     const actuales = leerFiltros(new URLSearchParams(consulta));
 
@@ -233,21 +262,23 @@ export default function HistorialComprasProveedor() {
     return obtenerHistorialDeCompras(id, actuales)
       .then((respuesta) => {
         if (!montado.current || numero !== ultimaConsulta.current) return;
-        setResultado(respuesta);
-        setError(null);
+        setCarga({ id, clave, resultado: respuesta, error: null });
       })
       .catch((fallo) => {
         if (!montado.current || numero !== ultimaConsulta.current) return;
-        setError(fallo);
-      })
-      .finally(() => {
-        if (montado.current && numero === ultimaConsulta.current) {
-          setCargando(false);
-        }
+        setCarga((previa) => ({
+          id,
+          clave,
+          // El nombre del proveedor no depende del período, así que sobrevive a
+          // un error de filtro. Si el que falló es otro proveedor, en cambio, no
+          // hay nada suyo que conservar.
+          resultado: previa.id === id ? previa.resultado : null,
+          error: fallo,
+        }));
       });
-    // Los setters son estables; van porque el React Compiler los infiere como
-    // dependencias y sin ellos descarta la memoización.
-  }, [consulta, id, setCargando, setError, setResultado]);
+    // `setCarga` es estable; va porque el React Compiler lo infiere como
+    // dependencia y sin él descarta la memoización.
+  }, [clave, consulta, id, setCarga]);
 
   useEffect(() => {
     cargar();
@@ -272,8 +303,6 @@ export default function HistorialComprasProveedor() {
       },
       { replace: true },
     );
-
-    setCargando(true);
   }
 
   /** Paginar no toca el período: solo cambia `?pagina`. */
@@ -285,13 +314,7 @@ export default function HistorialComprasProveedor() {
       return nuevos;
     });
 
-    setCargando(true);
     window.scrollTo?.({ top: 0 });
-  }
-
-  function reintentar() {
-    setCargando(true);
-    cargar();
   }
 
   const hayPeriodo = Boolean(filtros.desde || filtros.hasta);
@@ -302,11 +325,16 @@ export default function HistorialComprasProveedor() {
   // lo que hay que arreglar es la fecha.
   const errorDeFiltro = error?.status === 400 ? error.message : "";
   const sinProveedor = error?.status === 404;
-  const errorGeneral = error && !errorDeFiltro && !sinProveedor ? error : null;
+  // Con el rango al revés no se consulta, así que su "Reintentar" no mandaría
+  // nada: el error que quedó es de un intento anterior y el accionable es el
+  // de las fechas. Se muestra uno solo.
+  const errorGeneral =
+    error && !errorDeFiltro && !sinProveedor && !rangoInvalido ? error : null;
 
   // La identidad del proveedor no depende del período, así que sobrevive a un
-  // error de filtro. En el primer intento fallido todavía no hay nombre.
-  const proveedor = resultado?.proveedor;
+  // error de filtro. Pero no a un 404: ahí el nombre que quedó es de otro
+  // proveedor, y ponerlo arriba de "no existe" sería decir dos cosas opuestas.
+  const proveedor = sinProveedor ? null : resultado?.proveedor;
   const paginacion = resultado?.paginacion;
   const compras = resultado?.compras ?? [];
 
@@ -329,10 +357,7 @@ export default function HistorialComprasProveedor() {
   return (
     <main
       data-testid="historial-compras"
-      // Con el rango al revés no se consulta y `cargando` nunca baja. Decir
-      // "ocupado" ahí dejaría a un lector de pantalla esperando algo que no
-      // viene: lo que hay que atender es el error que está al lado del campo.
-      aria-busy={cargando && !rangoInvalido}
+      aria-busy={cargando}
       className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10"
     >
       <header className="mb-6">
@@ -435,10 +460,7 @@ export default function HistorialComprasProveedor() {
               <button
                 type="button"
                 data-testid="historial-compras-limpiar"
-                onClick={() => {
-                  setParametros({}, { replace: true });
-                  setCargando(true);
-                }}
+                onClick={() => setParametros({}, { replace: true })}
                 className={`self-start ${CLASES_BOTON_SECUNDARIO}`}
               >
                 Limpiar período
@@ -464,7 +486,10 @@ export default function HistorialComprasProveedor() {
               cierra la sesión (HU-32). No se reimplementa acá. */}
           {errorGeneral && (
             <div data-testid="historial-compras-error">
-              <AvisoDeError fallo={errorGeneral} alReintentar={reintentar} />
+              <AvisoDeError
+                fallo={errorGeneral}
+                alReintentar={() => setIntento((previo) => previo + 1)}
+              />
             </div>
           )}
 

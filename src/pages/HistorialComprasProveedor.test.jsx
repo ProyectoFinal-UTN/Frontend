@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import HistorialComprasProveedor from "./HistorialComprasProveedor";
 
 vi.mock("../services/proveedores", async (original) => ({
@@ -72,6 +78,29 @@ function UbicacionActual() {
   return <output data-testid="url">{search}</output>;
 }
 
+/**
+ * Navegación de verdad, para los casos en que la URL cambia sin pasar por los
+ * controles de la pantalla. Un `rerender` con otro `MemoryRouter` no sirve:
+ * `initialEntries` se lee una sola vez y la ruta se quedaría donde estaba.
+ */
+function Navegador() {
+  const navegar = useNavigate();
+  return (
+    <>
+      <button type="button" data-testid="nav-atras" onClick={() => navegar(-1)}>
+        atrás
+      </button>
+      <button
+        type="button"
+        data-testid="nav-otro-proveedor"
+        onClick={() => navegar("/proveedores/v2/compras")}
+      >
+        otro proveedor
+      </button>
+    </>
+  );
+}
+
 function renderizar(url = "/proveedores/v1/compras") {
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -82,6 +111,7 @@ function renderizar(url = "/proveedores/v1/compras") {
             <>
               <HistorialComprasProveedor />
               <UbicacionActual />
+              <Navegador />
             </>
           }
         />
@@ -631,6 +661,55 @@ describe("Errores", () => {
     expect(screen.queryByTestId("filtro-desde")).not.toBeInTheDocument();
   });
 
+  test("un 404 no deja el nombre del proveedor anterior en el título", async () => {
+    renderizar();
+    await esperarCarga();
+    expect(
+      screen.getByRole("heading", { level: 1, name: /Distribuidora Sur/ }),
+    ).toBeInTheDocument();
+
+    // Se navega a otro proveedor sin desmontar la pantalla, y ese no existe.
+    obtenerHistorialDeCompras.mockRejectedValue(
+      fallo(404, "El proveedor no existe"),
+    );
+    await userEvent.click(screen.getByTestId("nav-otro-proveedor"));
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("historial-compras-sin-proveedor"),
+      ).toBeInTheDocument(),
+    );
+    // Decir "Distribuidora Sur" arriba de "El proveedor no existe" sería
+    // afirmar dos cosas opuestas en la misma pantalla.
+    expect(screen.queryByText(/Distribuidora Sur/)).not.toBeInTheDocument();
+  });
+
+  test("con el rango al revés no se ofrece un «Reintentar» que no manda nada", async () => {
+    obtenerHistorialDeCompras.mockRejectedValue(new Error("Failed to fetch"));
+
+    renderizar();
+    await esperarCarga();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+
+    // Al invertir el rango la pantalla deja de consultar, así que reintentar
+    // no haría nada: lo accionable es la fecha, y es lo único que queda.
+    await userEvent.type(screen.getByTestId("filtro-desde"), "2026-05-10");
+    await userEvent.type(screen.getByTestId("filtro-hasta"), "2026-05-01");
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("La fecha «Desde» no puede ser posterior a «Hasta»."),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Reintentar" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("historial-compras")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+  });
+
   test("un 401 ofrece volver a entrar", async () => {
     obtenerHistorialDeCompras.mockRejectedValue(fallo(401, "No hay sesion activa"));
 
@@ -747,5 +826,77 @@ describe("Feedback mientras carga", () => {
     await waitFor(() =>
       expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument(),
     );
+  });
+
+  test("el botón atrás del navegador también avisa que está cargando", async () => {
+    // La URL cambia sin pasar por los controles de la pantalla. Si el
+    // "cargando" lo prendieran los handlers, se quedaría mostrando la página
+    // anterior entera, sin ninguna señal, todo el viaje.
+    obtenerHistorialDeCompras.mockResolvedValue(
+      respuesta({ paginacion: { pagina: 1, limite: 50, total: 60, totalPaginas: 2 } }),
+    );
+
+    renderizar();
+    await esperarCarga();
+
+    await userEvent.click(screen.getByTestId("pagina-siguiente"));
+    await waitFor(() => expect(url()).toMatch(/pagina=2/));
+
+    let resolver;
+    obtenerHistorialDeCompras.mockReturnValue(
+      new Promise((cumplir) => {
+        resolver = cumplir;
+      }),
+    );
+
+    await userEvent.click(screen.getByTestId("nav-atras"));
+
+    await waitFor(() => expect(url()).not.toMatch(/pagina/));
+    expect(screen.getByTestId("historial-compras")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(screen.getByText("Actualizando…")).toBeInTheDocument();
+
+    resolver(respuesta());
+    await waitFor(() =>
+      expect(screen.getByTestId("historial-compras")).toHaveAttribute(
+        "aria-busy",
+        "false",
+      ),
+    );
+  });
+
+  test("al cambiar de proveedor no se ven los datos del anterior", async () => {
+    renderizar();
+    await esperarCarga();
+    expect(screen.getByTestId("resumen-unidades")).toHaveTextContent("912");
+
+    let resolver;
+    obtenerHistorialDeCompras.mockReturnValue(
+      new Promise((cumplir) => {
+        resolver = cumplir;
+      }),
+    );
+
+    await userEvent.click(screen.getByTestId("nav-otro-proveedor"));
+
+    // Mientras viaja la consulta del nuevo, el nombre y el resumen del viejo
+    // no pueden quedar a la vista: se leerían como los del nuevo.
+    await waitFor(() =>
+      expect(screen.queryByText(/Distribuidora Sur/)).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByTestId("historial-compras-resumen"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("historial-compras-cargando")).toBeInTheDocument();
+
+    resolver(respuesta({ proveedor: { id: "v2", nombre: "Mayorista Norte" } }));
+    await esperarCarga();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: /Mayorista Norte/ }),
+    ).toBeInTheDocument();
+    expect(obtenerHistorialDeCompras.mock.calls.at(-1)[0]).toBe("v2");
   });
 });
