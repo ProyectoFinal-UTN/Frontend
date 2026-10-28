@@ -87,7 +87,9 @@ function texto(valor) {
 }
 
 /**
- * Reglas comunes a umbral mínimo y stock inicial.
+ * Reglas comunes a umbral mínimo y stock inicial. La usa también la
+ * configuración del umbral en el detalle del producto (HU-16), que pide
+ * exactamente lo mismo que este campo del formulario.
  *
  * Se chequea el texto con un regex en vez de `Number(valor)` porque `Number`
  * acepta "1e3", " 5 " y "0x10", que después el backend rechaza: más vale
@@ -95,7 +97,7 @@ function texto(valor) {
  *
  * @returns el mensaje de error, o `null` si el valor sirve.
  */
-function validarEntero(valor) {
+export function validarEntero(valor) {
   const texto = String(valor).trim();
 
   if (!texto) {

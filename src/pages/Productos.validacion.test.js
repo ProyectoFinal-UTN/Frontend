@@ -3,6 +3,7 @@ import {
   LARGO_MAXIMO_CATEGORIA,
   LARGO_MAXIMO_NOMBRE,
   MAXIMO_ENTERO,
+  validarEntero,
   validarProducto,
 } from "./Productos.validacion";
 
@@ -155,5 +156,20 @@ describe("validarProducto", () => {
       );
       expect(errores.nombre).toBe("Ingresá el nombre del producto.");
     });
+  });
+});
+
+// La usa sola la configuración del umbral en el detalle del producto (HU-16).
+describe("validarEntero", () => {
+  test("acepta el 0, que es 'sin umbral'", () => {
+    expect(validarEntero("0")).toBeNull();
+  });
+
+  test.each(["abc", "10abc", "-1", "2.5"])("rechaza %j", (valor) => {
+    expect(validarEntero(valor)).toMatch(/entero/);
+  });
+
+  test("rechaza el vacío", () => {
+    expect(validarEntero("  ")).toBe("Ingresá un número.");
   });
 });

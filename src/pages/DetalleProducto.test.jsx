@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import DetalleProducto from "./DetalleProducto";
-import { obtenerProducto } from "../services/productos";
+import { obtenerProducto, obtenerUmbral } from "../services/productos";
 import { registrarMovimiento } from "../services/movimientos";
 import { obtenerConfiguracion } from "../services/configuracion";
 import { configuracionDe } from "../tests/permisos";
@@ -59,6 +59,9 @@ describe("DetalleProducto", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     obtenerConfiguracion.mockResolvedValue(configuracionDe("propietario"));
+    // El bloque del umbral (HU-16) carga lo suyo aparte. 30 y no un número
+    // chico para no chocar con las cantidades de stock que buscan estos tests.
+    obtenerUmbral.mockResolvedValue({ productoId: "p1", umbralMinimo: 30 });
   });
 
   test("muestra 'Cargando datos…' mientras espera la respuesta", () => {
@@ -323,6 +326,34 @@ describe("DetalleProducto", () => {
     expect(
       await screen.findByRole("link", { name: "Transferir entre ubicaciones →" }),
     ).toHaveAttribute("href", "/transferencias?productoId=p1");
+  });
+
+  test("el propietario ve el umbral y puede configurarlo (HU-16)", async () => {
+    obtenerProducto.mockResolvedValueOnce(productoConStock());
+
+    renderizar();
+
+    expect(await screen.findByTestId("umbral-actual")).toHaveTextContent(
+      "llega a 30 o menos",
+    );
+    expect(
+      await screen.findByRole("form", { name: "Configurar umbral de reposición" }),
+    ).toBeInTheDocument();
+    expect(obtenerUmbral).toHaveBeenCalledWith("p1");
+  });
+
+  test("el empleado ve el umbral pero no puede cambiarlo (HU-16)", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+    obtenerProducto.mockResolvedValueOnce(productoConStock());
+
+    renderizar();
+
+    expect(await screen.findByTestId("umbral-actual")).toHaveTextContent(
+      "llega a 30 o menos",
+    );
+    expect(
+      screen.queryByRole("form", { name: "Configurar umbral de reposición" }),
+    ).not.toBeInTheDocument();
   });
 
   test("con una sola ubicación no ofrece transferir", async () => {

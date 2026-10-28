@@ -91,6 +91,17 @@ describe("Listado", () => {
     expect(screen.getByText("Yerba 1kg")).toBeInTheDocument();
   });
 
+  test("muestra el umbral con el mismo criterio que el detalle (HU-16)", () => {
+    renderizar({
+      productos: [PRODUCTOS[0], { ...PRODUCTOS[1], umbralMinimo: 0 }],
+    });
+
+    expect(
+      screen.getByText("Se mide en unidad · avisar con 5 o menos"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Se mide en kg · sin umbral")).toBeInTheDocument();
+  });
+
   test("avisa cuando todavía no hay ninguno", () => {
     renderizar({ productos: [] });
 
