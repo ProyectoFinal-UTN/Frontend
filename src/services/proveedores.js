@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import { finDelDia, inicioDelDia } from "./movimientos";
 
 /**
  * Directorio de proveedores (HU-19).
@@ -63,6 +64,64 @@ export function obtenerProveedoresDeProducto(productoId) {
 /** Productos activos de un proveedor, por nombre. 404 si el proveedor ya no existe. */
 export function obtenerProductosDeProveedor(proveedorId) {
   return apiFetch(`/proveedores/${proveedorId}/productos`);
+}
+
+/**
+ * Historial de compras a un proveedor (HU-21): qué se le compró, cuándo y
+ * cuánto, paginado y opcionalmente acotado a un período.
+ *
+ * `desde` y `hasta` se reciben como días (`YYYY-MM-DD`, lo que entrega un
+ * `<input type="date">`) y viajan como el primer y el último instante de esos
+ * días en la hora local. El endpoint rechaza con 400 cualquier fecha sin zona,
+ * así que la conversión la hace el cliente; es la misma que usa el historial de
+ * movimientos y se importa de ahí en vez de repetirla.
+ *
+ * No se manda `limite`: el default de 50 del backend alcanza y la pantalla no
+ * ofrece cambiarlo. Ojo si alguna vez se agrega ese control: un `limite` mayor
+ * a 200 se recorta **en silencio**, así que para mostrar "N de M" hay que leer
+ * `paginacion.limite` de la respuesta y nunca el valor que se pidió.
+ *
+ * El endpoint tampoco acepta `tipo` (es fijo "compra"), `productoId` ni
+ * `ubicacionId`.
+ *
+ * @returns `{ proveedor, compras, resumen, paginacion }`.
+ *   - `proveedor` trae `nombre` y `activo`. Es la fuente del título: este
+ *     historial responde también para un proveedor dado de baja, al que
+ *     `GET /proveedores/:id` le contesta 404.
+ *   - `compras` tiene la `cantidad` siempre positiva (son entradas), sin
+ *     usuario y sin `proveedorId`, a diferencia del historial de HU-14.
+ *   - `resumen` es de **todo el período filtrado**, no de la página, y su
+ *     `montos` viene siempre null: el libro de movimientos no guarda precios.
+ *   - Una `pagina` más allá del total responde 200 con `compras: []`, no 404.
+ *     Sin compras en el período, `total` y `totalPaginas` son 0 (no 1).
+ *
+ * Errores: 400 con un mensaje mostrable si el filtro es inválido —corta antes
+ * de buscar el proveedor, así que un id inexistente con una fecha rota da 400 y
+ * no 404—, y 404 "El proveedor no existe" tanto si no existe como si es de otro
+ * comercio o el id está mal formado. Los tres casos son indistinguibles a
+ * propósito.
+ */
+export function obtenerHistorialDeCompras(
+  proveedorId,
+  { desde, hasta, pagina } = {},
+) {
+  const parametros = new URLSearchParams();
+
+  const valores = {
+    desde: inicioDelDia(desde),
+    hasta: finDelDia(hasta),
+    pagina: pagina > 1 ? String(pagina) : undefined,
+  };
+
+  for (const [clave, valor] of Object.entries(valores)) {
+    if (valor) parametros.set(clave, valor);
+  }
+
+  const consulta = parametros.toString();
+
+  return apiFetch(
+    `/proveedores/${proveedorId}/historial-compras${consulta ? `?${consulta}` : ""}`,
+  );
 }
 
 /**
