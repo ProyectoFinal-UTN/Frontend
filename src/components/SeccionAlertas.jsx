@@ -158,9 +158,17 @@ export default function SeccionAlertas() {
           // `apiFetch` devuelve `null` ante un 2xx sin cuerpo o con un JSON
           // que no se pudo parsear. Guardarlo dejaba el panel en "Buscando…"
           // para siempre: un estado de carga que miente, porque ya no hay nada
-          // en vuelo. Para este contrato `alertas` y `paginacion` nunca son
-          // opcionales, así que se trata como el fallo que es.
-          if (!respuesta) {
+          // en vuelo.
+          //
+          // Se exigen las DOS claves y no solo que el cuerpo exista. El render
+          // lee `paginacion.totalPaginas` y `paginacion.pagina` derecho, así
+          // que un 2xx que parsea pero viene sin `paginacion` —una respuesta
+          // de un proxy mal configurado, un backend desfasado— tiraría un
+          // TypeError en el render y, sin error boundary, blanquearía el
+          // dashboard entero en vez de mostrar el aviso. Más vale que falle
+          // acá, una sola vez y por el camino que ya tiene "Reintentar", que
+          // sembrar `?.` en cada lectura del render.
+          if (!respuesta?.paginacion || !Array.isArray(respuesta.alertas)) {
             throw new Error(
               "No se pudieron leer las alertas. Probá de nuevo en un momento.",
             );

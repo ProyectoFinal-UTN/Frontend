@@ -541,6 +541,30 @@ describe("Errores", () => {
     expect(nombresVisibles()).toEqual(["p-Yerba"]);
   });
 
+  test.each([
+    ["sin cuerpo", null],
+    ["sin paginacion", { alertas: [] }],
+    ["sin alertas", { paginacion: { pagina: 1, limite: 6, total: 0, totalPaginas: 0 } }],
+    ["con alertas que no es un array", { alertas: null, paginacion: {} }],
+  ])(
+    "una respuesta %s se trata como un fallo y no rompe el dashboard",
+    async (_caso, cuerpo) => {
+      // El render lee `paginacion.totalPaginas` derecho. Un 2xx que parsea
+      // pero viene incompleto tiraría un TypeError y, sin error boundary,
+      // React desmontaría Inicio entero: el comerciante vería una pantalla en
+      // blanco en vez de un aviso con "Reintentar".
+      obtenerAlertas.mockResolvedValueOnce(cuerpo);
+
+      renderizar();
+
+      expect(await screen.findByTestId("aviso-general")).toBeInTheDocument();
+      expect(screen.queryByTestId("alertas-cargando")).not.toBeInTheDocument();
+      // Lo que importa: el panel sigue montado y con su título.
+      expect(panel()).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /Hay que reponer/ })).toBeInTheDocument();
+    },
+  );
+
   test("una respuesta sin cuerpo se trata como un fallo y no como carga eterna", async () => {
     // `apiFetch` devuelve null ante un 2xx con un JSON que no se pudo parsear.
     // Guardarlo dejaba el panel en "Buscando…" para siempre.
