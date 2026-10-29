@@ -35,11 +35,64 @@ vi.mock("../services/asistente", async (original) => ({
   obtenerRecomendaciones: vi.fn(),
 }));
 
+vi.mock("../services/alertas", async (original) => ({
+  ...(await original()),
+  obtenerAlertas: vi.fn(),
+}));
+
 const { useAuth } = await import("../hooks/useAuth");
 const { obtenerConfiguracion } = await import("../services/configuracion");
 const { obtenerProductos } = await import("../services/productos");
 const { obtenerHistorial } = await import("../services/movimientos");
 const { obtenerRecomendaciones } = await import("../services/asistente");
+const { obtenerAlertas } = await import("../services/alertas");
+
+/** Una alerta de reposición, para los tests que necesitan una fila. */
+function alerta() {
+  return {
+    id: "a1",
+    generadaEn: "2026-10-29T13:05:00.000Z",
+    producto: {
+      id: "p1",
+      nombre: "Yerba 1 kg",
+      codigoBarras: "7790000000000",
+      categoria: "Almacén",
+      unidadMedida: "unidad",
+    },
+    stockActual: 3,
+    umbralMinimo: 10,
+    faltanteHastaElUmbral: 7,
+    stockAlGenerar: 3,
+    umbralAlGenerar: 10,
+    ubicaciones: [{ id: "u1", nombre: "Depósito", cantidad: 3 }],
+    proveedorSugerido: {
+      id: "v1",
+      nombre: "Distribuidora Sur",
+      telefono: "11 5555-0000",
+      correo: "ventas@distrisur.com",
+    },
+    proveedores: [
+      {
+        id: "v1",
+        nombre: "Distribuidora Sur",
+        telefono: "11 5555-0000",
+        correo: "ventas@distrisur.com",
+      },
+    ],
+  };
+}
+
+function alertas(lista = []) {
+  return {
+    alertas: lista,
+    paginacion: {
+      pagina: 1,
+      limite: 6,
+      total: lista.length,
+      totalPaginas: lista.length ? 1 : 0,
+    },
+  };
+}
 
 function renderizar() {
   return render(
@@ -71,6 +124,7 @@ beforeEach(() => {
     resumen: "Por ahora no tengo sugerencias para hacerte.",
     recomendaciones: [],
   });
+  obtenerAlertas.mockResolvedValue(alertas());
 });
 
 describe("Saludo", () => {
@@ -191,6 +245,10 @@ describe("Recomendaciones (HU-27)", () => {
     await waitFor(() => expect(obtenerProductos).toHaveBeenCalled());
     expect(screen.queryByTestId("recomendaciones")).not.toBeInTheDocument();
     expect(obtenerRecomendaciones).not.toHaveBeenCalled();
+    // Lo mismo para el panel de alertas: con los permisos en vuelo no se monta
+    // ni se pide, así que no aparece y desaparece un instante después.
+    expect(screen.queryByTestId("alertas")).not.toBeInTheDocument();
+    expect(obtenerAlertas).not.toHaveBeenCalled();
   });
 
   test("si no se pudieron averiguar los permisos, se ofrece igual", async () => {
@@ -202,6 +260,82 @@ describe("Recomendaciones (HU-27)", () => {
     renderizar();
 
     expect(await screen.findByTestId("recomendaciones")).toBeInTheDocument();
+  });
+});
+
+describe("Alertas de reposición (HU-17)", () => {
+  test("con `alerta.read`, el panel está y se pide al entrar", async () => {
+    renderizar();
+
+    expect(await screen.findByTestId("alertas")).toBeInTheDocument();
+    expect(obtenerAlertas).toHaveBeenCalledTimes(1);
+  });
+
+  test("sin el permiso `alerta.read` no aparece NI se pide", async () => {
+    // Hoy los tres roles lo tienen, así que este caso no ocurre en producción.
+    // El test está igual porque el gate no es «todos pueden» sino «lo dice
+    // /api/configuracion»: si mañana el backend le saca el permiso a un rol,
+    // el panel tiene que desaparecer solo y sin pedir un 403 en cada carga.
+    const base = configuracionDe("empleado");
+    const permisos = Object.fromEntries(
+      Object.entries(base.permisos).filter(([recurso]) => recurso !== "alerta"),
+    );
+    obtenerConfiguracion.mockResolvedValue({ ...base, permisos });
+
+    renderizar();
+
+    await screen.findByRole("button", { name: /Preguntale al asistente/ });
+    expect(screen.queryByTestId("alertas")).not.toBeInTheDocument();
+    expect(obtenerAlertas).not.toHaveBeenCalled();
+  });
+
+  test("el empleado, que solo tiene `alerta.read`, igual lo ve", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+
+    expect(await screen.findByTestId("alertas")).toBeInTheDocument();
+  });
+
+  test("si no se pudieron averiguar los permisos, se muestra igual", async () => {
+    // `puedeSalvoQueFalle`: esconderlo le saca al comerciante lo más accionable
+    // del dashboard por un problema de red. Mostrarlo de más termina —en el
+    // peor caso— en un 403 que el aviso explica.
+    obtenerConfiguracion.mockRejectedValue(new Error("sin red"));
+
+    renderizar();
+
+    expect(await screen.findByTestId("alertas")).toBeInTheDocument();
+  });
+
+  test("va DESPUÉS del resumen y ANTES de las sugerencias de HU-27", async () => {
+    // Las alertas son el dato duro del backend; las sugerencias las arma el
+    // asistente y pueden venir degradadas. El dato va arriba de la sugerencia.
+    renderizar();
+
+    const panelDeAlertas = await screen.findByTestId("alertas");
+    const resumen = screen.getByText("Tu resumen");
+    const sugerencias = await screen.findByTestId("recomendaciones");
+
+    expect(
+      resumen.compareDocumentPosition(panelDeAlertas) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      panelDeAlertas.compareDocumentPosition(sugerencias) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  test("no desplaza ninguna de las tarjetas del resumen", async () => {
+    renderizar();
+
+    await screen.findByTestId("alertas");
+    await waitFor(() =>
+      expect(tarjeta("Productos en el catálogo")).toHaveTextContent("3"),
+    );
+    expect(tarjeta("Movimientos de hoy")).toHaveTextContent("12");
+    expect(tarjeta("Ubicaciones de stock")).toHaveTextContent("2");
   });
 });
 
@@ -239,14 +373,31 @@ describe("Contrato con la navegación", () => {
       ],
     });
 
+    // Con una alerta puesta, para que los links del panel de HU-17 —el del
+    // detalle y los de contacto del proveedor— entren en el chequeo. Sin esto
+    // el test pasaría sin haber mirado ninguno de los tres.
+    obtenerAlertas.mockResolvedValue(alertas([alerta()]));
+
     renderizar();
     await screen.findByTestId("recomendacion-reponer");
+    await screen.findByTestId("alerta-fila");
 
     const nombres = screen
       .getAllByRole("link")
       .map((link) => link.getAttribute("aria-label") ?? link.textContent);
 
-    expect(nombres).toEqual(["Ver stock de Yerba Playadito"]);
+    // Aserción completa y en orden, no un match parcial: lo que se verifica es
+    // justamente que no se haya colado ningún link de más en el dashboard.
+    //
+    // «Ver el detalle de» y no «Ver stock de» a propósito: HU-27 ya usa ese
+    // segundo texto para el MISMO producto, y dos links con el mismo nombre
+    // accesible en la misma pantalla romperían cualquier búsqueda por nombre.
+    expect(nombres).toEqual([
+      "11 5555-0000",
+      "ventas@distrisur.com",
+      "Ver el detalle de Yerba 1 kg",
+      "Ver stock de Yerba Playadito",
+    ]);
 
     // Por SUBSTRING y no por igualdad: así matchea Playwright cuando no se le
     // pasa `exact`, que es como buscan los page objects de Infraestructura. Un
