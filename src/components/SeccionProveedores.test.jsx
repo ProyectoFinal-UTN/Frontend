@@ -115,12 +115,14 @@ describe("Listado", () => {
     expect(within(fila).queryByText(/null/)).not.toBeInTheDocument();
   });
 
-  test("cada proveedor linkea a sus compras en el historial", () => {
+  // Desde HU-21 el destino es la pantalla propia del proveedor, con el resumen
+  // del período, y no el historial general filtrado por proveedor.
+  test("cada proveedor linkea a su historial de compras", () => {
     renderizar();
 
     expect(
       screen.getByRole("link", { name: "Ver compras a Distribuidora Sur" }),
-    ).toHaveAttribute("href", "/movimientos?proveedorId=v1");
+    ).toHaveAttribute("href", "/proveedores/v1/compras");
   });
 
   test("avisa cuando todavía no hay ninguno", () => {

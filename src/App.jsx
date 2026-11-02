@@ -6,6 +6,7 @@ import RutaProtegida from "./components/RutaProtegida";
 import Configuracion from "./pages/Configuracion";
 import DetalleProducto from "./pages/DetalleProducto";
 import EscanearProducto from "./pages/EscanearProducto";
+import HistorialComprasProveedor from "./pages/HistorialComprasProveedor";
 import HistorialMovimientos from "./pages/HistorialMovimientos";
 import ImportarProductos from "./pages/ImportarProductos";
 import Inicio from "./pages/Inicio";
@@ -130,6 +131,20 @@ export default function App() {
             element={
               <RutaProtegida permiso={{ proveedor: ["read"] }}>
                 <Proveedores />
+              </RutaProtegida>
+            }
+          />
+          {/*
+            El permiso es `movimiento: ["read"]` y no uno de proveedor: es el
+            que exige la ruta del backend, y lo tienen los tres roles. La
+            historia dice "como gerente", pero esconderla por rol le sacaría la
+            pantalla a un empleado que el backend sí deja entrar (HU-21).
+          */}
+          <Route
+            path="/proveedores/:id/compras"
+            element={
+              <RutaProtegida permiso={{ movimiento: ["read"] }}>
+                <HistorialComprasProveedor />
               </RutaProtegida>
             }
           />
