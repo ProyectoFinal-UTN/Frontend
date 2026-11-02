@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeftRight, ChevronRight, MapPin, Package, Sparkles } from "lucide-react";
+import SeccionAlertas from "../components/SeccionAlertas";
 import SeccionRecomendaciones from "../components/SeccionRecomendaciones";
 import { useAuth } from "../hooks/useAuth";
 import { usePermisos } from "../hooks/usePermisos";
@@ -13,9 +14,10 @@ import { EVENTO_ABRIR_ASISTENTE } from "../services/asistente";
  * Los accesos a cada pantalla vivían acá y se mudaron a la navegación
  * (`components/Navegacion.jsx`), que está en todas. Lo que queda es un panel
  * con lo que ya se puede saber del negocio: cuántos productos hay, cuánto se
- * movió hoy y en cuántas ubicaciones. El panel completo —ventas en pesos,
- * alertas, rotación— es de la épica E4 (dashboard de KPIs), y no se inventan
- * números que todavía no existen.
+ * movió hoy y en cuántas ubicaciones. Las ventas en pesos y la rotación siguen
+ * siendo de la épica E4 (dashboard de KPIs), y no se inventan números que
+ * todavía no existen; las alertas de reposición sí están, desde HU-17, porque
+ * el backend las expone (`GET /api/alertas`) y no hay nada que estimar.
  *
  * Las tarjetas del resumen NO son links, a propósito: "Productos en el
  * catálogo" sería un segundo link con "Productos" en el nombre, al lado del de
@@ -108,6 +110,20 @@ export default function Inicio() {
           />
         </div>
       </section>
+
+      {/*
+        Las alertas de reposición (HU-17) van ANTES de las sugerencias de
+        HU-27: son el dato duro del backend —qué alcanzó su umbral— mientras
+        las sugerencias las arma el asistente y pueden venir degradadas. Y
+        quedando acá, el banner de abajo sigue debajo de todo lo que ya
+        contesta "qué repongo hoy".
+
+        Mismo gate que el resto: por ACCIÓN y no por rol. Los tres roles tienen
+        `alerta.read`, así que en la práctica el panel se muestra a todos, pero
+        la decisión la toma el backend vía `/api/configuracion` y no una
+        comparación hardcodeada acá.
+      */}
+      {resuelto && puede("alerta", "read") && <SeccionAlertas />}
 
       {/*
         Las sugerencias proactivas (HU-27) van ANTES del banner del asistente.
