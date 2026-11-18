@@ -3,7 +3,8 @@
  *
  * Es una copia congelada de lo que devuelve `permisosDe()` en
  * `Backend/src/lib/permissions.js`, capturada contra la branch de HU-32 y
- * actualizada contra la de HU-27 (`asistente: ["consultar", "recomendaciones"]`).
+ * actualizada contra la de HU-27 (`asistente: ["consultar", "recomendaciones"]`)
+ * y la de HU-25 (`reporte: ["generar"]`).
  * Existe para poder renderizar una pantalla como empleado sin levantar el
  * backend.
  *
@@ -26,6 +27,7 @@ export const PERMISOS = Object.freeze({
     transferencia: ["create"],
     alerta: ["read", "update"],
     auditoria: ["read"],
+    reporte: ["generar"],
     cuenta: ["read", "delete"],
     asistente: ["consultar", "recomendaciones"],
   },
@@ -42,6 +44,8 @@ export const PERMISOS = Object.freeze({
     movimiento: ["create", "read"],
     transferencia: ["create"],
     alerta: ["read", "update"],
+    // HU-25: exportar reportes PDF es gestión, y la historia la escribe el gerente.
+    reporte: ["generar"],
     cuenta: ["read", "delete"],
     // Las recomendaciones de HU-27 también, aunque la historia diga "como
     // propietario": decidir qué reponer y qué no se está moviendo es operar el
