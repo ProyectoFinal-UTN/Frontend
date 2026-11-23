@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeftRight, ChevronRight, MapPin, Package, Sparkles } from "lucide-react";
 import SeccionAlertas from "../components/SeccionAlertas";
+import SeccionKpis from "../components/SeccionKpis";
 import SeccionRecomendaciones from "../components/SeccionRecomendaciones";
 import { useAuth } from "../hooks/useAuth";
 import { usePermisos } from "../hooks/usePermisos";
@@ -14,10 +15,11 @@ import { EVENTO_ABRIR_ASISTENTE } from "../services/asistente";
  * Los accesos a cada pantalla vivían acá y se mudaron a la navegación
  * (`components/Navegacion.jsx`), que está en todas. Lo que queda es un panel
  * con lo que ya se puede saber del negocio: cuántos productos hay, cuánto se
- * movió hoy y en cuántas ubicaciones. Las ventas en pesos y la rotación siguen
- * siendo de la épica E4 (dashboard de KPIs), y no se inventan números que
- * todavía no existen; las alertas de reposición sí están, desde HU-17, porque
- * el backend las expone (`GET /api/alertas`) y no hay nada que estimar.
+ * movió hoy y en cuántas ubicaciones. Debajo, para quien gestiona el negocio,
+ * los KPIs de HU-22 (estado del stock, rotación y compras por proveedor, de
+ * `GET /api/kpis`), y las alertas de reposición de HU-17. Las ventas en pesos
+ * siguen sin estar: el modelo no guarda precios, y no se inventan números que
+ * todavía no existen.
  *
  * Las tarjetas del resumen NO son links, a propósito: "Productos en el
  * catálogo" sería un segundo link con "Productos" en el nombre, al lado del de
@@ -110,6 +112,14 @@ export default function Inicio() {
           />
         </div>
       </section>
+
+      {/*
+        Los KPIs de HU-22, debajo del resumen que ven todos. Mismo gate que el
+        resto: por ACCIÓN y no por rol. Hoy `kpi.read` lo tienen el propietario
+        y el gerente; el empleado no monta la sección y no dispara un 403 en
+        cada carga de Inicio.
+      */}
+      {resuelto && puede("kpi", "read") && <SeccionKpis />}
 
       {/*
         Las alertas de reposición (HU-17) van ANTES de las sugerencias de

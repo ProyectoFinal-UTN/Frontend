@@ -3,7 +3,8 @@
  *
  * Es una copia congelada de lo que devuelve `permisosDe()` en
  * `Backend/src/lib/permissions.js`, capturada contra la branch de HU-32 y
- * actualizada contra la de HU-27 (`asistente: ["consultar", "recomendaciones"]`).
+ * actualizada contra la de HU-27 (`asistente: ["consultar", "recomendaciones"]`)
+ * y la de HU-22 (`kpi: ["read"]` para propietario y gerente).
  * Existe para poder renderizar una pantalla como empleado sin levantar el
  * backend.
  *
@@ -28,6 +29,7 @@ export const PERMISOS = Object.freeze({
     auditoria: ["read"],
     cuenta: ["read", "delete"],
     asistente: ["consultar", "recomendaciones"],
+    kpi: ["read"],
   },
 
   // Opera el negocio completo pero no lo administra: ve el equipo en lectura,
@@ -47,6 +49,7 @@ export const PERMISOS = Object.freeze({
     // propietario": decidir qué reponer y qué no se está moviendo es operar el
     // negocio, que es lo que este rol hace.
     asistente: ["consultar", "recomendaciones"],
+    kpi: ["read"],
   },
 
   // Registra movimientos y consulta. Ni `member`, ni `invitation`, ni

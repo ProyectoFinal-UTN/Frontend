@@ -40,7 +40,17 @@ vi.mock("../services/alertas", async (original) => ({
   obtenerAlertas: vi.fn(),
 }));
 
+vi.mock("../services/kpis", async (original) => ({
+  ...(await original()),
+  obtenerKpis: vi.fn(),
+}));
+
+// Recharts necesita medir el contenedor (ResizeObserver), que jsdom no tiene.
+// Los gráficos tienen su propio test; acá alcanza con que la sección exista.
+vi.mock("../components/GraficoKpi", () => ({ default: () => null }));
+
 const { useAuth } = await import("../hooks/useAuth");
+const { obtenerKpis } = await import("../services/kpis");
 const { obtenerConfiguracion } = await import("../services/configuracion");
 const { obtenerProductos } = await import("../services/productos");
 const { obtenerHistorial } = await import("../services/movimientos");
@@ -125,6 +135,63 @@ beforeEach(() => {
     recomendaciones: [],
   });
   obtenerAlertas.mockResolvedValue(alertas());
+  obtenerKpis.mockResolvedValue(kpisVacios());
+});
+
+/** Una respuesta de `GET /api/kpis` sin actividad. */
+function kpisVacios() {
+  return {
+    generadoEn: "2026-11-22T13:00:00.000Z",
+    periodo: { dias: 30, desde: "2026-10-24T03:00:00.000Z", hasta: "2026-11-22T13:00:00.000Z", zonaHoraria: "America/Argentina/Buenos_Aires" },
+    stock: { productos: 0, unidades: 0, sinStock: 0, bajoUmbral: 0, normal: 0, productosSinVentas: 0, porUbicacion: [] },
+    rotacion: { ventas: 0, unidadesVendidas: 0, productosSinVentas: 0, masVendidos: [], porDia: [], montos: null },
+    comprasPorProveedor: { compras: 0, unidades: 0, proveedoresConCompras: 0, proveedores: [], otros: null, sinProveedor: null, montos: null },
+  };
+}
+
+describe("KPIs (HU-22)", () => {
+  test("con `kpi.read`, la sección está y se pide al entrar", async () => {
+    renderizar();
+
+    expect(await screen.findByTestId("kpis")).toBeInTheDocument();
+    expect(obtenerKpis).toHaveBeenCalled();
+  });
+
+  test("el empleado, que no tiene `kpi.read`, no la ve NI la pide", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
+
+    renderizar();
+
+    // Las alertas sí las ve: se espera a que aparezcan para saber que los
+    // permisos ya se resolvieron y que la ausencia no es "todavía no".
+    await screen.findByTestId("alertas");
+    expect(screen.queryByTestId("kpis")).not.toBeInTheDocument();
+    expect(obtenerKpis).not.toHaveBeenCalled();
+  });
+
+  test("el gerente también la ve", async () => {
+    obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
+
+    renderizar();
+
+    expect(await screen.findByTestId("kpis")).toBeInTheDocument();
+  });
+
+  test("va DESPUÉS del resumen y ANTES de las alertas", async () => {
+    renderizar();
+
+    const kpis = await screen.findByTestId("kpis");
+    const panelDeAlertas = await screen.findByTestId("alertas");
+    const resumen = screen.getByText("Tu resumen");
+
+    expect(
+      resumen.compareDocumentPosition(kpis) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      kpis.compareDocumentPosition(panelDeAlertas) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });
 
 describe("Saludo", () => {
