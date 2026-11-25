@@ -17,6 +17,7 @@ import Proveedores from "./pages/Proveedores";
 import Recuperar from "./pages/Recuperar";
 import Registro from "./pages/Registro";
 import RegistrarMovimiento from "./pages/RegistrarMovimiento";
+import Reportes from "./pages/Reportes";
 import Restablecer from "./pages/Restablecer";
 import Transferencias from "./pages/Transferencias";
 
@@ -145,6 +146,22 @@ export default function App() {
             element={
               <RutaProtegida permiso={{ movimiento: ["read"] }}>
                 <HistorialComprasProveedor />
+              </RutaProtegida>
+            }
+          />
+          {/*
+            Provisoria (HU-25): hoy la pantalla solo tiene el reporte PDF, que
+            exige `reporte:generar`. Cuando lleguen los KPIs (HU-22/23), revisar
+            este permiso si el empleado también tiene que ver la página.
+          */}
+          <Route
+            path="/reportes"
+            element={
+              <RutaProtegida
+                permiso={{ reporte: ["generar"] }}
+                mensajeSinPermiso="Tu rol no puede generar reportes. Pedíselo al propietario o al gerente del comercio."
+              >
+                <Reportes />
               </RutaProtegida>
             }
           />

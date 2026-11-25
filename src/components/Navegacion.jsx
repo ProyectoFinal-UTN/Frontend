@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeftRight,
+  ChartColumn,
   CirclePlus,
   Ellipsis,
   History,
@@ -256,7 +257,22 @@ export default function Navegacion() {
         )}
 
         {/*
-          El único acceso que el empleado pierde hoy: la pantalla consulta el
+          «Reportes y KPIs» (E4). Hoy la pantalla solo tiene el reporte PDF de
+          HU-25, que es de gestión: el empleado no lo ve. Si los KPIs (HU-22/23)
+          se abren a más roles, este permiso cambia junto con el de la ruta.
+        */}
+        {resuelto && puede("reporte", "generar") && (
+          <Acceso
+            pathname={pathname}
+            a="/reportes"
+            etiqueta="Reportes"
+            icono={ChartColumn}
+            testId="acceso-reportes"
+          />
+        )}
+
+        {/*
+          Otro acceso que el empleado no tiene: la pantalla consulta el
           código contra `producto:create`.
         */}
         {resuelto && puede("producto", "create") && (
