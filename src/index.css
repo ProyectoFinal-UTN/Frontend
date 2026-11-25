@@ -32,6 +32,8 @@
   /* Acento: el naranja del prototipo, para el asistente. */
   --color-acento: oklch(68% 0.17 50);
   --color-acento-texto: oklch(99% 0.005 90);
+  /* Fondo del ícono de la tarjeta de reporte PDF (HU-25). */
+  --color-acento-suave: oklch(94% 0.05 60);
 
   /* Estados */
   --color-exito: oklch(58% 0.13 152);
@@ -67,6 +69,7 @@
 
     --color-acento: oklch(72% 0.16 50);
     --color-acento-texto: oklch(20% 0.02 60);
+    --color-acento-suave: oklch(35% 0.07 50);
 
     --color-exito: oklch(65% 0.13 152);
     --color-exito-suave: oklch(33% 0.06 152);

@@ -23,13 +23,14 @@ vi.mock("../services/configuracion", async (original) => ({
 const { cerrarSesion } = await import("../services/auth");
 const { obtenerConfiguracion } = await import("../services/configuracion");
 
-/** Los siete accesos que dependen del rol, por el testid que usa también el E2E. */
+/** Los accesos que dependen del rol, por el testid que usa también el E2E. */
 const ACCESOS = [
   "acceso-registrar-movimiento",
   "acceso-historial",
   "acceso-productos",
   "acceso-transferir",
   "acceso-proveedores",
+  "acceso-reportes",
   "acceso-escanear",
   "acceso-configuracion",
 ];
@@ -56,13 +57,13 @@ beforeEach(() => {
 });
 
 describe("Accesos según el rol", () => {
-  test("el propietario ve los siete", async () => {
+  test("el propietario los ve todos", async () => {
     renderizar();
 
     await waitFor(() => expect(visibles()).toEqual(ACCESOS));
   });
 
-  test("el gerente ve los siete: opera el negocio completo", async () => {
+  test("el gerente los ve todos: opera el negocio completo", async () => {
     obtenerConfiguracion.mockResolvedValue(configuracionDe("gerente"));
 
     renderizar();
@@ -73,7 +74,7 @@ describe("Accesos según el rol", () => {
   // El único acceso que se pierde hoy: el escaneo consulta
   // `GET /api/productos/codigo/:codigo`, que exige `producto:create`.
   // Dejárselo al empleado era mandarlo derecho a un 403.
-  test("el empleado no ve «Escanear producto», y sí todo lo demás", async () => {
+  test("el empleado no ve «Reportes» ni «Escanear producto», y sí todo lo demás", async () => {
     obtenerConfiguracion.mockResolvedValue(configuracionDe("empleado"));
 
     renderizar();
@@ -92,6 +93,10 @@ describe("Accesos según el rol", () => {
 
     expect(
       screen.queryByRole("link", { name: "Escanear producto" }),
+    ).not.toBeInTheDocument();
+    // El reporte PDF (HU-25) es de gestión: el empleado no tiene `reporte:generar`.
+    expect(
+      screen.queryByRole("link", { name: "Reportes" }),
     ).not.toBeInTheDocument();
   });
 
@@ -149,6 +154,7 @@ describe("El nombre accesible es el contrato", () => {
       "Productos",
       "Transferir stock",
       "Proveedores",
+      "Reportes",
       "Escanear producto",
       "Configuración",
     ]) {
