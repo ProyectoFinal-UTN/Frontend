@@ -1,0 +1,48 @@
+# Integracion continua del Frontend (T-17).
+#
+# Lint, tests (Vitest) y build de produccion en cada PR hacia dev o main, y en
+# cada push a esas ramas. El check "Frontend / Lint, tests y build" es el que
+# pide la proteccion de rama para poder mergear.
+#
+# El build va aunque no se publique nada: un import roto o un error que solo
+# aparece al compilar para produccion no lo atrapa ni el lint ni Vitest, y es
+# justo lo que despues rompe el deploy en Vercel.
+name: Frontend
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Lint, tests y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
