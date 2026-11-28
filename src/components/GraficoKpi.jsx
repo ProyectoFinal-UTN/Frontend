@@ -48,26 +48,24 @@ const TOOLTIP = {
 
 const formatear = (valor) => Number(valor).toLocaleString("es-AR");
 
-/** "2026-11-22" → "22/11", sin pasar por `Date`: es un día, no un instante. */
-function diaCorto(fecha) {
-  const [, mes, dia] = fecha.split("-");
-  return `${dia}/${mes}`;
-}
-
+/**
+ * La serie de ventas: una barra por día, por semana o por mes.
+ *
+ * El eje usa `etiqueta` y no `fecha` (HU-23): con un rango largo la barra ya no
+ * es un día sino un grupo de días —"16/11–22/11", "nov 26"—, y quien decide
+ * cómo se agrupa y cómo se llama cada grupo es `agruparSerie` en
+ * `services/periodos.js`. Acá sólo se dibuja lo que llega, sin volver a
+ * formatear nada: así el eje, el tooltip y la tabla accesible que pone
+ * `SeccionKpis` dicen exactamente lo mismo.
+ */
 function VentasPorDia({ datos }) {
   return (
     <BarChart data={datos} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
       <CartesianGrid vertical={false} stroke="var(--color-borde)" />
-      <XAxis
-        dataKey="fecha"
-        tickFormatter={diaCorto}
-        minTickGap={16}
-        {...EJE}
-      />
+      <XAxis dataKey="etiqueta" minTickGap={16} {...EJE} />
       <YAxis allowDecimals={false} tickFormatter={formatear} {...EJE} />
       <Tooltip
         {...TOOLTIP}
-        labelFormatter={diaCorto}
         formatter={(valor) => [formatear(valor), "Unidades vendidas"]}
       />
       <Bar dataKey="unidades" fill={COLORES.ventas} radius={[6, 6, 0, 0]} />
